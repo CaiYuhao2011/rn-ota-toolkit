@@ -1,0 +1,29 @@
+{
+  "name": "rn-ota-workspace",
+  "version": "1.0.0",
+  "description": "React Native OTA 升级服务",
+  "private": true,
+  "workspaces": [
+    "packages/client-sdk",
+    "packages/cli"
+  ],
+  "scripts": {
+    "cli": "node packages/cli/bin/rn-ota.js",
+    "install:all": "npm install",
+    "clean": "rm -rf node_modules packages/*/node_modules"
+  },
+  "keywords": [
+    "react-native",
+    "ota",
+    "update",
+    "offline",
+    "workspace",
+    "docker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
+
