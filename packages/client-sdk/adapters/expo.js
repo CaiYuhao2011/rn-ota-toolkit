@@ -1,9 +1,9 @@
 /**
  * Expo 适配器
  */
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Updates from 'expo-updates';
-import { Platform } from 'react-native';
 
 const ExpoAdapter = {
   platform: Platform.OS,
@@ -99,4 +99,3 @@ const ExpoAdapter = {
 };
 
 export default ExpoAdapter;
-

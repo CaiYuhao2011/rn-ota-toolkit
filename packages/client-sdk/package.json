@@ -1,12 +1,19 @@
 {
   "name": "rn-ota-client",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "React Native OTA 客户端 SDK（支持 Expo）",
   "main": "index.js",
   "types": "index.d.ts",
+  "exports": {
+    ".": "./index.js",
+    "./expo": "./expo.js"
+  },
   "files": [
     "index.js",
+    "expo.js",
+    "core.js",
     "index.d.ts",
+    "OTAContext.js",
     "UpdateModal.js",
     "adapters/",
     "README.md"

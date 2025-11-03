@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { Component, ReactNode } from 'react';
 
 export interface OTAConfig {
   /** 服务器地址 */
@@ -107,7 +107,21 @@ export default class OTAUpdater {
 }
 
 /**
- * OTA 更新弹窗组件
+ * OTA Provider Props
  */
-export class OTAUpdateModal extends Component<any, ModalState> {}
+export interface OTAProviderProps {
+  children: ReactNode;
+}
+
+/**
+ * OTA Context Provider
+ * 必须包裹在应用最外层，为 OTAUpdateModal 提供状态管理
+ */
+export function OTAProvider(props: OTAProviderProps): JSX.Element;
+
+/**
+ * OTA 更新弹窗组件
+ * 必须在 OTAProvider 内部使用
+ */
+export function OTAUpdateModal(): JSX.Element;
 

@@ -1,7 +1,7 @@
 /**
- * React Native 入口
+ * Expo 入口
  */
-import adapter from './adapters/rn';
+import adapter from './adapters/expo';
 import { createOTAUpdater, OTAUpdateModal, OTAProvider } from './core';
 
 const OTAUpdater = createOTAUpdater(adapter);

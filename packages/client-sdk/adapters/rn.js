@@ -1,10 +1,10 @@
 /**
  * React Native 适配器
  */
+import { Platform } from 'react-native';
 import RNFS from 'react-native-fs';
-import { NativeModules, Platform } from 'react-native';
-
-const { RNRestart } = NativeModules;
+import RNRestart from 'react-native-restart';
+import RNFetchBlob from 'react-native-blob-util';
 
 const RNAdapter = {
   platform: Platform.OS,
@@ -13,7 +13,7 @@ const RNAdapter = {
    * 获取文档目录路径
    */
   get documentDirectory() {
-    return RNFS.DocumentDirectoryPath;
+    return RNFS.DocumentDirectoryPath + '/';
   },
 
   /**
@@ -37,7 +37,6 @@ const RNAdapter = {
     return RNFS.downloadFile({
       fromUrl,
       toFile,
-      progressDivider: 10,
       progress,
     });
   },
@@ -61,22 +60,17 @@ const RNAdapter = {
    */
   async installApk(path) {
     if (Platform.OS !== 'android') {
-      throw new Error('仅支持 Android');
+      throw new Error('仅支持 Android 平台');
     }
-    await RNFS.installApk(path);
+    await RNFetchBlob.android.actionViewIntent(path, 'application/vnd.android.package-archive');
   },
 
   /**
    * 重启应用
    */
-  async restart() {
-    if (RNRestart && RNRestart.Restart) {
-      RNRestart.Restart();
-    } else {
-      throw new Error('RNRestart 不可用');
-    }
+  restart() {
+    RNRestart.restart();
   },
 };
 
 export default RNAdapter;
-
