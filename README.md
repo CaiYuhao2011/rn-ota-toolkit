@@ -42,7 +42,7 @@ docker-compose up -d
 
 📖 [详细文档](./ota-server/README.md)
 
-### 2. Client SDK (@rn-ota/client-sdk)
+### 2. Client SDK (rn-ota-client)
 
 React Native 客户端 SDK，支持 React Native 和 Expo 项目。
 
@@ -56,12 +56,12 @@ React Native 客户端 SDK，支持 React Native 和 Expo 项目。
 
 **安装**:
 ```bash
-npm install @rn-ota/client-sdk
+npm install rn-ota-client
 ```
 
 **使用示例**:
 ```javascript
-import { OTAUpdater, UpdateModal } from '@rn-ota/client-sdk';
+import { OTAUpdater, UpdateModal } from 'rn-ota-client';
 
 const updater = new OTAUpdater({
   serverUrl: 'http://192.168.1.100:8080',
@@ -77,7 +77,7 @@ updater.checkUpdate();
 
 📖 [详细文档](./packages/client-sdk/README.md)
 
-### 3. CLI Tool (@rn-ota/cli)
+### 3. CLI Tool (rn-ota-cli)
 
 命令行工具，用于构建和部署 React Native 应用。
 
@@ -90,7 +90,7 @@ updater.checkUpdate();
 
 **安装**:
 ```bash
-npm install -g @rn-ota/cli
+npm install -g rn-ota-cli
 ```
 
 **使用示例**:
@@ -130,7 +130,7 @@ docker-compose logs -f ota-server
 ### 2. 安装 CLI 工具
 
 ```bash
-npm install -g @rn-ota/cli
+npm install -g rn-ota-cli
 
 # 配置服务器地址
 rn-ota config set server http://localhost:8080
@@ -142,7 +142,7 @@ rn-ota config set server http://localhost:8080
 
 ```bash
 cd my-app
-npm install @rn-ota/client-sdk
+npm install rn-ota-client
 
 # React Native 需要额外安装
 npm install react-native-fs react-native-restart
@@ -156,7 +156,7 @@ npx expo install expo-file-system expo-updates expo-constants
 ```javascript
 // App.js
 import React, { useEffect } from 'react';
-import { OTAUpdater, UpdateModal } from '@rn-ota/client-sdk';
+import { OTAUpdater, UpdateModal } from 'rn-ota-client';
 
 const updater = new OTAUpdater({
   serverUrl: 'http://192.168.1.100:8080',
@@ -235,7 +235,7 @@ rn-ota deploy -d "修复若干问题"
 ```
 ┌─────────────────┐
 │  React Native   │
-│   Application   │ ◄── 集成 @rn-ota/client-sdk
+│   Application   │ ◄── 集成 rn-ota-client
 └────────┬────────┘
          │
          │ HTTP Request
@@ -255,7 +255,7 @@ rn-ota deploy -d "修复若干问题"
          │ CLI Upload
          │
 ┌─────────────────┐
-│   @rn-ota/cli   │
+│   rn-ota-cli    │
 │  (Command Tool) │ ◄── 开发者使用
 └─────────────────┘
 ```
@@ -368,7 +368,7 @@ npm link
 
 # 在测试项目中
 cd my-test-app
-npm link @rn-ota/client-sdk
+npm link rn-ota-client
 ```
 
 ### 开发 CLI 工具
