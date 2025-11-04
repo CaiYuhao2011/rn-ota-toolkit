@@ -1,0 +1,79 @@
+{
+  "name": "rn-ota-client",
+  "version": "1.0.9",
+  "description": "React Native OTA 客户端 SDK（仅支持原生项目，不支持 Expo Managed）",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": "./index.js",
+    "./expo": "./expo.js"
+  },
+  "files": [
+    "index.js",
+    "expo.js",
+    "core.js",
+    "index.d.ts",
+    "OTAContext.js",
+    "UpdateModal.js",
+    "adapters/",
+    "README.md",
+    "SETUP_SIMPLE.md"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublishOnly": "echo 'Publishing rn-ota-client...'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "your-repo-url"
+  },
+  "keywords": [
+    "react-native",
+    "ota",
+    "update",
+    "hot-update",
+    "bundle",
+    "热更新"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-native": ">=0.60.0",
+    "react-native-fs": "^2.0.0",
+    "react-native-restart": "^0.0.27",
+    "react-native-blob-util": "^0.19.0",
+    "react-native-zip-archive": "^6.0.0",
+    "expo-file-system": ">=10.0.0",
+    "expo-updates": ">=0.0.0",
+    "expo-constants": ">=0.0.0",
+    "expo-intent-launcher": ">=10.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native-fs": {
+      "optional": true
+    },
+    "react-native-restart": {
+      "optional": true
+    },
+    "react-native-blob-util": {
+      "optional": true
+    },
+    "react-native-zip-archive": {
+      "optional": true
+    },
+    "expo-file-system": {
+      "optional": true
+    },
+    "expo-updates": {
+      "optional": true
+    },
+    "expo-constants": {
+      "optional": true
+    },
+    "expo-intent-launcher": {
+      "optional": true
+    }
+  },
+  "dependencies": {}
+}

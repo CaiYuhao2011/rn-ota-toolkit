@@ -1,307 +1,75 @@
-# React Native OTA 更新系统
+# OTA Server
 
-一套完整的 React Native 热更新解决方案，支持局域网部署，无需外网访问。
+React Native OTA 更新服务器，基于 Spring Boot 3 + MyBatis Plus + MinIO 实现。
 
-## 项目结构
+## 技术栈
 
-```
-OTA/
-├── packages/
-│   ├── client-sdk/          # React Native 客户端 SDK
-│   ├── cli/                 # 命令行工具
-│   └── ...
-├── ota-server/              # Java Spring Boot 服务端
-└── README.md
-```
+- **Java 17**
+- **Spring Boot 3.2.0**
+- **MyBatis Plus 3.5.5** - 数据库操作
+- **MySQL 8.0** - 数据存储
+- **MinIO** - 对象存储
+- **Docker & Docker Compose** - 容器化部署
 
-## 核心组件
+## 功能特性
 
-### 1. OTA Server (Java Spring Boot)
-
-基于 Spring Boot 3 + MyBatis Plus + MinIO 的 OTA 更新服务器。
-
-**技术栈**:
-- Java 17
-- Spring Boot 3.2.0
-- MyBatis Plus 3.5.5
-- MySQL 8.0
-- MinIO 对象存储
-
-**特性**:
 - ✅ 版本上传与管理
 - ✅ 自动更新检查
 - ✅ 支持增量更新（Bundle）和全量更新（APK/IPA）
 - ✅ 支持 Android 和 iOS 双平台
+- ✅ 基于 MinIO 的文件存储
+- ✅ RESTful API 设计
 - ✅ Docker 一键部署
-
-**快速启动**:
-```bash
-cd ota-server
-docker-compose up -d
-```
-
-📖 [详细文档](./ota-server/README.md)
-
-### 2. Client SDK (rn-ota-client)
-
-React Native 客户端 SDK，支持 React Native 和 Expo 项目。
-
-**特性**:
-- ✅ 自动检查更新
-- ✅ 热更新（JS Bundle）
-- ✅ 全量更新（APK/IPA）
-- ✅ 下载进度提示
-- ✅ TypeScript 支持
-- ✅ React Native 和 Expo 双支持
-
-**安装**:
-```bash
-npm install rn-ota-client
-```
-
-**使用示例**:
-```javascript
-import { OTAUpdater, UpdateModal } from 'rn-ota-client';
-
-const updater = new OTAUpdater({
-  serverUrl: 'http://192.168.1.100:8080',
-  appName: 'MyApp',
-  version: '1.0.0'
-});
-
-updater.setModalComponent(UpdateModal);
-
-// 检查更新
-updater.checkUpdate();
-```
-
-📖 [详细文档](./packages/client-sdk/README.md)
-
-### 3. CLI Tool (rn-ota-cli)
-
-命令行工具，用于构建和部署 React Native 应用。
-
-**特性**:
-- ✅ 自动检测项目类型（React Native / Expo）
-- ✅ 支持 Android 和 iOS 双平台
-- ✅ 支持 Bundle 和原生包（APK/IPA）构建
-- ✅ 智能版本管理（自动递增、自动写回）
-- ✅ 一键部署到 OTA 服务器
-
-**安装**:
-```bash
-npm install -g rn-ota-cli
-```
-
-**使用示例**:
-```bash
-# 配置服务器
-rn-ota config set server http://192.168.1.100:8080
-
-# 部署双平台热更新（自动版本管理）
-cd my-app
-rn-ota deploy
-
-# 部署 Android 强制更新
-rn-ota deploy --platform android -t apk
-```
-
-📖 [详细文档](./packages/cli/README.md)
 
 ## 快速开始
 
-### 1. 启动 OTA 服务器
+### 方式一：Docker Compose（推荐）
 
 ```bash
-cd ota-server
+# 启动所有服务（MySQL + MinIO + OTA Server）
 docker-compose up -d
-
-# 查看服务状态
-docker-compose ps
 
 # 查看日志
 docker-compose logs -f ota-server
+
+# 停止服务
+docker-compose down
+
+# 清理所有数据（包括数据库和文件）
+docker-compose down -v
 ```
 
 服务访问地址：
 - OTA Server: http://localhost:8080
 - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+- MySQL: localhost:3306
 
-### 2. 安装 CLI 工具
+### 方式二：本地开发
 
-```bash
-npm install -g rn-ota-cli
+#### 1. 环境准备
 
-# 配置服务器地址
-rn-ota config set server http://localhost:8080
-```
+- JDK 17+
+- Maven 3.6+
+- MySQL 8.0+
+- MinIO
 
-### 3. 集成客户端 SDK
-
-在你的 React Native 项目中：
-
-```bash
-cd my-app
-npm install rn-ota-client
-
-# React Native 需要额外安装
-npm install react-native-fs react-native-restart
-
-# Expo 需要额外安装
-npx expo install expo-file-system expo-updates expo-constants
-```
-
-在代码中集成：
-
-```javascript
-// App.js
-import React, { useEffect } from 'react';
-import { OTAUpdater, UpdateModal } from 'rn-ota-client';
-
-const updater = new OTAUpdater({
-  serverUrl: 'http://192.168.1.100:8080',
-  appName: 'MyApp',
-  version: '1.0.0'
-});
-
-function App() {
-  useEffect(() => {
-    // 设置更新 UI 组件
-    updater.setModalComponent(UpdateModal);
-    
-    // 检查更新
-    updater.checkUpdate();
-  }, []);
-
-  return (
-    // 你的应用内容
-  );
-}
-
-export default App;
-```
-
-### 4. 构建和部署
+#### 2. 数据库初始化
 
 ```bash
-# 在项目目录下
-cd my-app
-
-# 部署热更新（双平台，自动版本管理）
-rn-ota deploy
-
-# 或者分步操作
-# 1. 构建 Bundle
-rn-ota build --platform android
-
-# 2. 上传
-rn-ota upload -f ./build/index.android.bundle -a MyApp -p android -v 1.0.1
+# 创建数据库
+mysql -u root -p < src/main/resources/sql/schema.sql
 ```
 
-## 完整工作流
+#### 3. 配置文件
 
-### 开发流程
-
-```bash
-# 1. 启动 OTA 服务器
-cd ota-server
-docker-compose up -d
-
-# 2. 开发 React Native 应用
-cd ../my-app
-npm run start
-
-# 3. 测试功能
-
-# 4. 部署热更新
-rn-ota deploy
-```
-
-### 版本管理
-
-```bash
-# 查看所有版本
-rn-ota list
-
-# 删除指定版本
-rn-ota delete -a MyApp -p android -v 1.0.0
-
-# 部署新版本（自动版本号 +1）
-rn-ota deploy -d "修复若干问题"
-```
-
-## 系统架构
-
-```
-┌─────────────────┐
-│  React Native   │
-│   Application   │ ◄── 集成 rn-ota-client
-└────────┬────────┘
-         │
-         │ HTTP Request
-         │
-         ▼
-┌─────────────────┐
-│   OTA Server    │
-│  (Spring Boot)  │
-├─────────────────┤
-│  - API Layer    │
-│  - Service      │
-│  - MySQL        │ ◄── 存储版本信息
-│  - MinIO        │ ◄── 存储 Bundle/APK/IPA 文件
-└────────┬────────┘
-         ▲
-         │
-         │ CLI Upload
-         │
-┌─────────────────┐
-│   rn-ota-cli    │
-│  (Command Tool) │ ◄── 开发者使用
-└─────────────────┘
-```
-
-## API 接口
-
-### 检查更新
-```
-GET /ota/check?appName=MyApp&platform=android&version=1.0.0
-```
-
-### 上传版本
-```
-POST /ota/upload
-Content-Type: multipart/form-data
-
-bundle: <file>
-appName: MyApp
-platform: android
-version: 1.0.1
-updateType: incremental
-```
-
-### 版本列表
-```
-GET /ota/versions
-```
-
-### 删除版本
-```
-DELETE /ota/upload/{appName}/{platform}/{version}
-```
-
-## 配置说明
-
-### 服务器配置 (application.yml)
+修改 `src/main/resources/application.yml`：
 
 ```yaml
-server:
-  port: 8080
-
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/ota
+    url: jdbc:mysql://localhost:3306/ota?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
-    password: root
+    password: your_password
 
 minio:
   endpoint: http://localhost:9000
@@ -310,96 +78,272 @@ minio:
   bucket-name: ota-files
 ```
 
-### 客户端配置
-
-```javascript
-const updater = new OTAUpdater({
-  serverUrl: 'http://192.168.1.100:8080',  // OTA 服务器地址
-  appName: 'MyApp',                        // 应用名称
-  version: '1.0.0'                         // 当前版本
-});
-```
-
-### CLI 配置
+#### 4. 启动 MinIO
 
 ```bash
-# 配置文件位置: ~/.rn-ota-config.json
-rn-ota config set server http://192.168.1.100:8080
+# 使用 Docker 启动 MinIO
+docker run -d \
+  --name minio \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  minio/minio server /data --console-address ":9001"
+
+# 手动创建 bucket（可选）
+# 访问 http://localhost:9001 (minioadmin/minioadmin)
+# 在 MinIO Console 中创建 bucket: ota-files
+```
+
+#### 5. 运行项目
+
+```bash
+# 编译
+mvn clean package
+
+# 运行
+java -jar target/ota-server-1.0.0.jar
+
+# 或使用 Maven
+mvn spring-boot:run
+```
+
+## API 文档
+
+### 1. 上传新版本
+
+**接口**: `POST /ota/upload`
+
+**Content-Type**: `multipart/form-data`
+
+**参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| bundle | File | 是 | Bundle 文件或 APK/IPA 文件 |
+| appName | String | 是 | 应用名称 |
+| platform | String | 是 | 平台（android/ios） |
+| version | String | 是 | 版本号 |
+| updateType | String | 是 | 更新类型（incremental/full） |
+| description | String | 否 | 版本描述 |
+| minAppVersion | String | 否 | 最低应用版本要求 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "操作成功",
+  "data": {
+    "id": 1,
+    "appName": "MyApp",
+    "platform": "android",
+    "version": "1.0.1",
+    "updateType": "incremental",
+    "description": "修复若干问题",
+    "bundleUrl": "http://localhost:9000/ota-files/MyApp/android/1.0.1/index.android.bundle",
+    "fileSize": 2457600,
+    "createTime": "2024-01-01T12:00:00",
+    "updateTime": "2024-01-01T12:00:00"
+  }
+}
+```
+
+### 2. 检查更新
+
+**接口**: `GET /ota/check`
+
+**参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| appName | String | 是 | 应用名称 |
+| platform | String | 是 | 平台（android/ios） |
+| version | String | 是 | 当前版本号 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "操作成功",
+  "data": {
+    "id": 2,
+    "appName": "MyApp",
+    "platform": "android",
+    "version": "1.0.2",
+    "updateType": "incremental",
+    "description": "新功能上线",
+    "bundleUrl": "http://localhost:9000/ota-files/MyApp/android/1.0.2/index.android.bundle",
+    "fileSize": 2500000,
+    "createTime": "2024-01-02T12:00:00",
+    "updateTime": "2024-01-02T12:00:00"
+  }
+}
+```
+
+### 3. 获取最新版本
+
+**接口**: `GET /ota/latest`
+
+**参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| appName | String | 是 | 应用名称 |
+| platform | String | 是 | 平台（android/ios） |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "操作成功",
+  "data": {
+    "id": 2,
+    "appName": "MyApp",
+    "platform": "android",
+    "version": "1.0.2",
+    "updateType": "incremental",
+    "description": "新功能上线",
+    "bundleUrl": "http://localhost:9000/ota-files/MyApp/android/1.0.2/index.android.bundle",
+    "fileSize": 2500000,
+    "createTime": "2024-01-02T12:00:00"
+  }
+}
+```
+
+### 4. 获取版本列表
+
+**接口**: `GET /ota/versions`
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "操作成功",
+  "rows": [
+    {
+      "id": 1,
+      "appName": "MyApp",
+      "platform": "android",
+      "version": "1.0.1",
+      "updateType": "incremental",
+      "bundleUrl": "...",
+      "createTime": "2024-01-01T12:00:00"
+    }
+  ],
+  "total": 1
+}
+```
+
+### 5. 删除版本
+
+**接口**: `DELETE /ota/upload/{appName}/{platform}/{version}`
+
+**参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| appName | String | 是 | 应用名称（路径参数） |
+| platform | String | 是 | 平台（路径参数） |
+| version | String | 是 | 版本号（路径参数） |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "操作成功"
+}
+```
+
+## 配置说明
+
+### application.yml
+
+```yaml
+server:
+  port: 8080                          # 服务端口
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/ota  # 数据库地址
+    username: root                     # 数据库用户名
+    password: root                     # 数据库密码
+  
+  servlet:
+    multipart:
+      max-file-size: 100MB            # 最大文件大小
+      max-request-size: 100MB         # 最大请求大小
+
+minio:
+  endpoint: http://localhost:9000     # MinIO 地址
+  access-key: minioadmin              # MinIO 访问密钥
+  secret-key: minioadmin              # MinIO 密钥
+  bucket-name: ota-files              # 存储桶名称
+```
+
+## 目录结构
+
+```
+ota-server/
+├── src/main/java/com/ota/
+│   ├── OtaServerApplication.java      # 启动类
+│   ├── common/
+│   │   └── Result.java                # 统一响应结果
+│   ├── controller/
+│   │   └── OtaController.java         # OTA 控制器
+│   ├── dto/
+│   │   └── UploadRequest.java         # 上传请求 DTO
+│   ├── entity/
+│   │   └── Version.java               # 版本实体
+│   ├── mapper/
+│   │   └── VersionMapper.java         # 版本 Mapper
+│   └── service/
+│       ├── MinioService.java          # MinIO 服务接口
+│       ├── OtaService.java            # OTA 服务接口
+│       └── impl/
+│           ├── MinioServiceImpl.java  # MinIO 服务实现
+│           └── OtaServiceImpl.java    # OTA 服务实现
+├── src/main/resources/
+│   ├── application.yml                # 配置文件
+│   └── sql/
+│       └── schema.sql                 # 数据库初始化脚本
+├── Dockerfile                         # Docker 镜像配置
+├── docker-compose.yml                 # Docker Compose 配置
+├── pom.xml                           # Maven 配置
+└── README.md                         # 说明文档
 ```
 
 ## 常见问题
 
-### Q: 如何在局域网中使用？
+### Q: 如何修改文件大小限制？
+
+A: 修改 `application.yml` 中的 `spring.servlet.multipart.max-file-size` 配置。
+
+### Q: 如何使用外部 MinIO？
+
+A: 修改 `application.yml` 中的 `minio.endpoint`、`access-key`、`secret-key` 配置。
+
+### Q: 如何备份数据？
 
 A: 
-1. 启动 OTA Server 在局域网内的服务器上
-2. 配置客户端 `serverUrl` 为服务器的局域网 IP
-3. 确保移动设备和服务器在同一局域网
-
-### Q: 如何实现灰度发布？
-
-A: 在服务端添加灰度逻辑，根据设备 ID 或用户 ID 返回不同版本。
-
-### Q: 热更新后何时生效？
-
-A: 
-- OTA 更新：下载完成后会提示用户重启应用
-- 全量更新：下载完成后引导用户安装 APK 或跳转 App Store
-
-### Q: 支持回滚吗？
-
-A: 可以通过部署旧版本实现回滚，客户端会自动检测到"新"版本并更新。
-
-### Q: 如何保证更新安全？
-
-A: 
-1. 使用 HTTPS
-2. 对 Bundle 文件进行签名验证
-3. 在服务端添加访问控制
-
-## 开发指南
-
-### 开发客户端 SDK
-
 ```bash
-cd packages/client-sdk
-npm install
-npm link
+# 备份数据库
+docker exec ota-mysql mysqldump -u root -proot ota > ota_backup.sql
 
-# 在测试项目中
-cd my-test-app
-npm link rn-ota-client
+# 备份 MinIO 数据（复制 volume）
+docker run --rm -v ota_minio-data:/data -v $(pwd):/backup alpine tar czf /backup/minio_backup.tar.gz /data
 ```
 
-### 开发 CLI 工具
+### Q: 如何查看日志？
 
+A:
 ```bash
-cd packages/cli
-npm install
-npm link
+# Docker Compose
+docker-compose logs -f ota-server
 
-# 测试
-rn-ota --help
+# Docker
+docker logs -f ota-server
+
+# 本地开发（日志文件在 logs/ 目录）
+tail -f logs/spring.log
 ```
-
-### 开发服务端
-
-```bash
-cd ota-server
-mvn clean install
-mvn spring-boot:run
-```
-
-## 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
 
 ## License
 
 MIT
 
-## 相关链接
-
-- [OTA Server 文档](./ota-server/README.md)
-- [Client SDK 文档](./packages/client-sdk/README.md)
-- [CLI 文档](./packages/cli/README.md)
