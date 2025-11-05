@@ -31,7 +31,7 @@ cd ota-server
 docker-compose up -d
 ```
 
-服务端运行在 `http://localhost:8080`
+服务端运行在 `http://localhost:10080`
 
 ### 2. 安装 CLI
 
@@ -75,7 +75,7 @@ export default function App() {
 
 // 在某处初始化并检查更新
 const otaUpdater = new OTAUpdater({
-  serverUrl: 'http://192.168.1.100:8080',
+  serverUrl: 'http://192.168.1.100:10080',
   appName: 'MyApp',
   version: '1.0.0'
 });

@@ -33,13 +33,17 @@ rn-ota build -p ~/Projects/MyApp
 # 
 # 🤖 ANDROID
 #    Bundle: /Users/username/Projects/MyApp/build/index.android.bundle
-#    大小: 2.35 MB
-#    资源: /Users/username/Projects/MyApp/build/assets
+#    Bundle 大小: 2.35 MB
+#    Assets: /Users/username/Projects/MyApp/build/assets (drawable-* 目录)
+#    📦 Zip 包: /Users/username/Projects/MyApp/build/bundle-android.zip
+#    📦 Zip 大小: 2.50 MB
 # 
 # 🍎 IOS
 #    Bundle: /Users/username/Projects/MyApp/build/index.ios.bundle
-#    大小: 2.41 MB
-#    资源: /Users/username/Projects/MyApp/build/assets
+#    Bundle 大小: 2.41 MB
+#    Assets: /Users/username/Projects/MyApp/build/assets
+#    📦 Zip 包: /Users/username/Projects/MyApp/build/bundle-ios.zip
+#    📦 Zip 大小: 2.56 MB
 ```
 
 ### Expo 项目
@@ -72,7 +76,9 @@ rn-ota build -p ./MyApp -o ./dist/bundles
 # 输出将保存在：
 # - ./dist/bundles/index.android.bundle
 # - ./dist/bundles/index.ios.bundle
-# - ./dist/bundles/assets/
+# - ./dist/bundles/bundle-android.zip
+# - ./dist/bundles/bundle-ios.zip
+# - ./dist/bundles/assets/ (临时目录，包含 drawable-* 等)
 ```
 
 ### 自定义入口文件
@@ -98,17 +104,18 @@ rn-ota build -p ./MyApp --android
 
 # 2. 查看构建产物
 ls -lh MyApp/build/
-# total 4.8M
+# total 5.0M
 # -rw-r--r-- 1 user user 2.4M Nov  3 10:30 index.android.bundle
-# drwxr-xr-x 2 user user 4.0K Nov  3 10:30 assets/
+# -rw-r--r-- 1 user user 2.5M Nov  3 10:30 bundle-android.zip
+# drwxr-xr-x 5 user user 4.0K Nov  3 10:30 assets/ (包含 drawable-mdpi, drawable-hdpi 等)
 
-# 3. 上传到测试服务器
+# 3. 上传到测试服务器（上传 zip 包，包含 bundle + assets）
 rn-ota upload \
-  -f ./MyApp/build/index.android.bundle \
+  -f ./MyApp/build/bundle-android.zip \
   -a MyApp \
   -p android \
   -v 1.0.1-beta \
-  -s http://192.168.1.100:8080 \
+  -s http://192.168.1.100:10080 \
   -d "测试版本：修复登录问题"
 ```
 
@@ -120,23 +127,23 @@ rn-ota build -p ./MyApp
 
 # 2. 分别上传 Android 和 iOS
 rn-ota upload \
-  -f ./MyApp/build/index.android.bundle \
+  -f ./MyApp/build/bundle-android.zip \
   -a MyApp \
   -p android \
   -v 1.0.2 \
-  -s http://production.server.com:8080 \
+  -s http://production.server.com:10080 \
   -d "修复了支付模块的崩溃问题"
 
 rn-ota upload \
-  -f ./MyApp/build/index.ios.bundle \
+  -f ./MyApp/build/bundle-ios.zip \
   -a MyApp \
   -p ios \
   -v 1.0.2 \
-  -s http://production.server.com:8080 \
+  -s http://production.server.com:10080 \
   -d "修复了支付模块的崩溃问题"
 
 # 3. 验证发布
-rn-ota list -s http://production.server.com:8080
+rn-ota list -s http://production.server.com:10080
 ```
 
 ### 场景 3：快速部署（推荐）
@@ -149,7 +156,7 @@ rn-ota deploy \
   -r ./MyApp \
   -a MyApp \
   -v 1.0.3 \
-  -s http://production.server.com:8080 \
+  -s http://production.server.com:10080 \
   -d "新增分享功能" \
   --android \
   --ios
@@ -159,7 +166,7 @@ rn-ota deploy \
   -r ./MyApp \
   -a MyApp \
   -v 1.0.3-hotfix \
-  -s http://production.server.com:8080 \
+  -s http://production.server.com:10080 \
   -d "紧急修复：闪退问题" \
   --android
 ```
@@ -221,7 +228,7 @@ rn-ota deploy \
   -r ./MyExpoApp \
   -a MyExpoApp \
   -v 1.0.0 \
-  -s http://192.168.1.100:8080 \
+  -s http://192.168.1.100:10080 \
   --android
 ```
 
@@ -230,7 +237,7 @@ rn-ota deploy \
 ### 查看所有版本
 
 ```bash
-rn-ota list -s http://production.server.com:8080
+rn-ota list -s http://production.server.com:10080
 
 # 输出示例：
 # 📋 已发布的版本:
@@ -253,11 +260,11 @@ rn-ota delete \
   -a MyApp \
   -p android \
   -v 1.0.1 \
-  -s http://production.server.com:8080
+  -s http://production.server.com:10080
 
 # 批量删除（使用 shell 脚本）
 for version in 1.0.1 1.0.2 1.0.3; do
-  rn-ota delete -a MyApp -p android -v $version -s http://localhost:8080
+  rn-ota delete -a MyApp -p android -v $version -s http://localhost:10080
 done
 ```
 
@@ -312,7 +319,7 @@ rn-ota build -p ./MyExpoApp
 # 配置
 PROJECT_PATH="./MyApp"
 APP_NAME="MyApp"
-SERVER="http://production.server.com:8080"
+SERVER="http://production.server.com:10080"
 
 # 读取版本号
 echo "请输入版本号（例如 1.0.4）："

@@ -1,27 +1,22 @@
 {
   "name": "rn-ota-client",
-  "version": "1.0.9",
+  "version": "1.5.0",
   "description": "React Native OTA 客户端 SDK（仅支持原生项目，不支持 Expo Managed）",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./index.js",
-    "./expo": "./expo.js"
+    ".": "./dist/index.js",
+    "./expo": "./dist/expo.js"
   },
   "files": [
-    "index.js",
-    "expo.js",
-    "core.js",
-    "index.d.ts",
-    "OTAContext.js",
-    "UpdateModal.js",
-    "adapters/",
+    "dist/",
     "README.md",
     "SETUP_SIMPLE.md"
   ],
   "scripts": {
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepublishOnly": "echo 'Publishing rn-ota-client...'"
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -38,16 +33,16 @@
   "author": "",
   "license": "MIT",
   "peerDependencies": {
+    "expo-constants": ">=0.0.0",
+    "expo-file-system": ">=10.0.0",
+    "expo-intent-launcher": ">=10.0.0",
+    "expo-updates": ">=0.0.0",
     "react": ">=16.8.0",
     "react-native": ">=0.60.0",
+    "react-native-blob-util": ">=0.13.7",
     "react-native-fs": "^2.0.0",
     "react-native-restart": "^0.0.27",
-    "react-native-blob-util": "^0.19.0",
-    "react-native-zip-archive": "^6.0.0",
-    "expo-file-system": ">=10.0.0",
-    "expo-updates": ">=0.0.0",
-    "expo-constants": ">=0.0.0",
-    "expo-intent-launcher": ">=10.0.0"
+    "react-native-zip-archive": ">=6.0.0"
   },
   "peerDependenciesMeta": {
     "react-native-fs": {
@@ -75,5 +70,19 @@
       "optional": true
     }
   },
-  "dependencies": {}
+  "devDependencies": {
+    "@types/react": "^18.3.26",
+    "@types/react-native": "^0.72.8",
+    "typescript": "^5.9.3",
+    "react": "^18.2.0",
+    "react-native": "^0.72.0",
+    "react-native-fs": "^2.20.0",
+    "react-native-restart": "^0.0.27",
+    "react-native-blob-util": "^0.19.0",
+    "react-native-zip-archive": "^7.0.0",
+    "expo-file-system": "^17.0.0",
+    "expo-updates": "^0.25.0",
+    "expo-constants": "^16.0.0",
+    "expo-intent-launcher": "^11.0.0"
+  }
 }

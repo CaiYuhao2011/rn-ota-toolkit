@@ -75,11 +75,13 @@ async function packBundleToZip(bundlePath, assetsPath, outputDir, platform) {
     // 添加 bundle 文件到 zip 根目录
     archive.file(bundlePath, { name: path.basename(bundlePath) });
 
-    // 如果 assets 目录存在，添加到 zip
+    // 如果 assets 目录存在，将其内容（drawable-* 等）直接添加到 zip 根目录
+    // 注意：不是添加 assets 文件夹，而是添加其内部的 drawable-* 目录
     if (fs.existsSync(assetsPath)) {
       const files = fs.readdirSync(assetsPath);
       if (files.length > 0) {
-        archive.directory(assetsPath, 'assets');
+        // 直接将 assets 内容放到 zip 根目录，不创建 assets 子目录
+        archive.directory(assetsPath, false);
       }
     }
 

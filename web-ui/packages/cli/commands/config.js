@@ -8,7 +8,7 @@ async function configCommand(options) {
     case 'set':
       if (!key || !value) {
         console.error(chalk.red('\n❌ 请指定 key 和 value\n'));
-        console.log(chalk.gray('示例: rn-ota config set server http://192.168.1.100:8080\n'));
+        console.log(chalk.gray('示例: rn-ota config set server http://192.168.1.100:10080\n'));
         process.exit(1);
       }
       if (setConfig(key, value)) {

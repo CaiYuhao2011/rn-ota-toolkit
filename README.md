@@ -40,7 +40,7 @@ docker-compose down -v
 ```
 
 服务访问地址：
-- OTA Server: http://localhost:8080
+- OTA Server: http://localhost:10080
 - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
 - MySQL: localhost:3306
 
@@ -256,7 +256,7 @@ mvn spring-boot:run
 
 ```yaml
 server:
-  port: 8080                          # 服务端口
+  port: 10080                          # 服务端口
 
 spring:
   datasource:

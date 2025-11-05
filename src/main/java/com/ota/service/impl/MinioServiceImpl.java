@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.annotation.PostConstruct;
+
 @Slf4j
 @Service
 public class MinioServiceImpl implements MinioService {
@@ -27,13 +29,16 @@ public class MinioServiceImpl implements MinioService {
 
     private MinioClient minioClient;
 
+    @PostConstruct
+    public void init() {
+        this.minioClient = MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(accessKey, secretKey)
+                .build();
+        log.info("MinIO client initialized with endpoint: {}", endpoint);
+    }
+
     private MinioClient getMinioClient() {
-        if (minioClient == null) {
-            minioClient = MinioClient.builder()
-                    .endpoint(endpoint)
-                    .credentials(accessKey, secretKey)
-                    .build();
-        }
         return minioClient;
     }
 

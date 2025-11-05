@@ -35,7 +35,7 @@ program
   .requiredOption('-a, --app <name>', '应用名称')
   .requiredOption('-v, --version <version>', '版本号')
   .requiredOption('-p, --platform <platform>', '平台：android 或 ios')
-  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:8080')
+  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:10080')
   .option('-d, --description <text>', '版本描述', '')
   .option('-m, --min-app-version <version>', '最小应用版本', '0.0.0')
   .action(uploadCommand);
@@ -44,7 +44,7 @@ program
 program
   .command('list')
   .description('列出所有已发布的版本')
-  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:8080')
+  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:10080')
   .action(listCommand);
 
 // 删除版本命令
@@ -54,7 +54,7 @@ program
   .requiredOption('-a, --app <name>', '应用名称')
   .requiredOption('-v, --version <version>', '版本号')
   .requiredOption('-p, --platform <platform>', '平台：android 或 ios')
-  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:8080')
+  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:10080')
   .action(deleteCommand);
 
 // 构建命令（Bundle 或 原生包）
@@ -78,7 +78,7 @@ program
   .option('-p, --project <path>', 'React Native 项目路径', '.')
   .option('--platform <platform>', '平台：android、ios 或 all', 'all')
   .option('-t, --type <type>', '部署类型：bundle（热更新）、apk 或 ipa（强制更新）', 'bundle')
-  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:8080')
+  .option('-s, --server <url>', '服务器地址', getConfig('server') || 'http://localhost:10080')
   .option('-d, --description <text>', '版本描述', '')
   .option('-m, --min-app-version <version>', '最低应用版本要求', '')
   .option('--debug', 'Debug 版本（仅原生包）', false)

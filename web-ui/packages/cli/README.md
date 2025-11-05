@@ -14,7 +14,7 @@ npm install -g rn-ota-cli
 
 ```json
 {
-  "server": "http://192.168.1.100:8080",
+  "server": "http://192.168.1.100:10080",
   "appName": "MyApp"
 }
 ```

@@ -19,7 +19,7 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 10080
 
 # 启动应用
 ENTRYPOINT ["java", "-jar", "app.jar"]

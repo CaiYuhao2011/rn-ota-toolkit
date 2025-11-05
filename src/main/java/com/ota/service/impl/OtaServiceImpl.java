@@ -54,13 +54,13 @@ public class OtaServiceImpl implements OtaService {
         version.setAppName(request.getAppName());
         version.setPlatform(request.getPlatform());
         version.setVersion(request.getVersion());
+        version.setBundleFilename(fileName);
+        version.setFileSize(request.getBundle().getSize());
         version.setUpdateType(request.getUpdateType());
         version.setDescription(request.getDescription());
         version.setMinAppVersion(request.getMinAppVersion());
-        version.setBundleFilename(fileName);
-        version.setBundleUrl(fileUrl);
-        version.setFileSize(request.getBundle().getSize());
-        version.setCreateTime(LocalDateTime.now());
+        version.setDownloadUrl(fileUrl);
+        version.setUploadTime(LocalDateTime.now());
         version.setUpdateTime(LocalDateTime.now());
 
         versionMapper.insert(version);
@@ -133,8 +133,8 @@ public class OtaServiceImpl implements OtaService {
             wrapper.eq(Version::getPlatform, platform);
         }
 
-        // 按创建时间倒序
-        wrapper.orderByDesc(Version::getCreateTime);
+        // 按上传时间倒序
+        wrapper.orderByDesc(Version::getUploadTime);
 
         return versionMapper.selectPage(page, wrapper);
     }
