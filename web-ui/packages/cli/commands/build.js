@@ -248,6 +248,15 @@ async function buildAndroidAPK({ projectPath, output, buildType }) {
       execSync(`chmod +x "${gradlewPath}"`, { stdio: 'pipe' });
     }
 
+    spinner.text = '正在清理旧的构建文件...';
+    
+    // 先执行 clean
+    const cleanCommand = process.platform === 'win32'
+      ? `cd "${androidDir}" && gradlew.bat clean`
+      : `cd "${androidDir}" && ./gradlew clean`;
+    
+    execSync(cleanCommand, { stdio: 'pipe' });
+
     spinner.text = '正在编译 APK（这可能需要几分钟）...';
 
     const gradleCommand = buildType === 'release' ? 'assembleRelease' : 'assembleDebug';

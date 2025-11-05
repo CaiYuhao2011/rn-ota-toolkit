@@ -204,10 +204,14 @@ export class OTAUpdater {
   private showForceUpdateDialog(updateInfo: UpdateInfo): void {
     if (this.adapter.installApk) {
       // Android 整包更新
+      const message = updateInfo.description
+        ? `版本 ${updateInfo.version}\n需要下载安装包进行更新\n\n${updateInfo.description}`
+        : `版本 ${updateInfo.version}\n需要下载安装包进行更新`;
+      
       this.updateModal({
         visible: true,
         title: '发现新版本',
-        message: `版本 ${updateInfo.version}\n需要下载安装包进行更新`,
+        message: message,
         showProgress: false,
         progress: 0,
         confirmText: '立即更新',
@@ -254,8 +258,21 @@ export class OTAUpdater {
         this.updateModal({ progress });
       });
 
-      // 安装 APK
-      await this.adapter.installApk!(apkPath);
+      // 下载完成，等待用户确认安装
+      this.updateModal({
+        visible: true,
+        showProgress: false,
+        title: '下载完成',
+        message: '安装包已下载完成，点击立即安装',
+        confirmText: '立即安装',
+        cancelText: '',
+        cancelable: false,
+        onConfirm: async () => {
+          this.updateModal({ visible: false });
+          await this.adapter.installApk!(apkPath);
+        },
+        onCancel: null,
+      });
     } catch (error) {
       console.error('[OTA] 安装包下载失败:', error);
       throw error;
