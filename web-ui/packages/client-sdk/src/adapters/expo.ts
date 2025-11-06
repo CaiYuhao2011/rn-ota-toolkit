@@ -2,7 +2,7 @@
  * Expo 适配器
  */
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Updates from 'expo-updates';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { unzip } from 'react-native-zip-archive';

@@ -331,12 +331,14 @@ export class OTAUpdater {
         onProgress(0.85);
       }
 
-      // 查找解压后的 bundle 文件
+      // 查找解压后的 bundle 文件（支持 .bundle 和 .hbc Hermes bytecode）
       const files = await this.adapter.readDir(tempExtractDir);
-      const bundleFile = files.find(f => f.name && f.name.includes('.bundle'));
+      const bundleFile = files.find(f => 
+        f.name && (f.name.includes('.bundle') || f.name.endsWith('.hbc'))
+      );
       
       if (!bundleFile) {
-        throw new Error('解压后未找到 bundle 文件');
+        throw new Error('解压后未找到 bundle 文件（.bundle 或 .hbc）');
       }
 
       const extractedBundlePath = `${tempExtractDir}/${bundleFile.name}`;

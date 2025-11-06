@@ -4,7 +4,7 @@ const path = require('path');
 const chalk = require('chalk');
 const ora = require('ora');
 const archiver = require('archiver');
-const { getAppName } = require('../utils/project');
+const { getAppVersion, updateAppVersion, versionToVersionCode } = require('../utils/project');
 
 /**
  * 检测项目类型
@@ -129,20 +129,20 @@ async function buildReactNativeBundle(options) {
 
     // 暂停 spinner 显示构建输出
     spinner.stop();
-    console.log(chalk.gray(`正在执行: npx react-native bundle --platform ${platform} --reset-cache...\n`));
+    console.log(chalk.cyan(`\n开始构建 ${platform.toUpperCase()} Bundle...\n`));
+    console.log(chalk.gray(`命令: npx react-native bundle --platform ${platform} --reset-cache\n`));
     
     execSync(command, { stdio: 'inherit' });
     
-    // 恢复 spinner
-    spinner.start();
-
+    console.log(); // 换行
+    const packSpinner = ora('检查构建产物...').start();
     const size = (fs.statSync(bundleOutput).size / 1024 / 1024).toFixed(2);
-    spinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (${size} MB)`));
+    packSpinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (${size} MB)`));
 
     // 打包 bundle + assets 成 zip
-    spinner.start('正在打包 bundle 和 assets...');
+    const zipSpinner = ora('正在打包 bundle 和 assets...').start();
     const { zipPath, zipSize } = await packBundleToZip(bundleOutput, assetsOutput, outputDir, platform);
-    spinner.succeed(chalk.green(`打包完成: bundle-${platform}.zip (${zipSize} MB)`));
+    zipSpinner.succeed(chalk.green(`打包完成: bundle-${platform}.zip (${zipSize} MB)`));
 
     return {
       bundlePath: bundleOutput,
@@ -172,6 +172,10 @@ async function buildExpoBundle(options) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
+    // 清理 Metro 缓存
+    spinner.text = '清理 Metro 缓存...';
+    cleanMetroCache();
+
     // Expo 导出命令
     const exportDir = path.join(outputDir, 'expo-export');
     const command = [
@@ -183,34 +187,97 @@ async function buildExpoBundle(options) {
       '--clear'
     ].join(' ');
 
-    execSync(command, { stdio: 'pipe' });
-
-    // Expo 导出的 bundle 位置
-    const bundleFileName = `index.${platform}.bundle`;
-    const expoBundlePath = path.join(exportDir, 'bundles', bundleFileName);
+    // 暂停 spinner 显示构建输出
+    spinner.stop();
+    console.log(chalk.cyan(`\n开始导出 Expo ${platform.toUpperCase()} Bundle...\n`));
+    console.log(chalk.gray(`命令: npx expo export --platform ${platform} --clear\n`));
+    
+    execSync(command, { stdio: 'inherit' });
+    
+    console.log(); // 换行
+    
+    // Expo 导出的 bundle 位置（尝试多个可能的路径）
+    // 新版 Expo (SDK 50+) 的 bundle 在 _expo/static/js/{platform}/ 目录下
+    // 查找主 bundle 文件（通常是 entry-*.js 或 entry-*.hbc）
+    const processSpinner = ora('查找导出的 bundle 文件...').start();
+    let sourceBundlePath = null;
+    let bundleExtension = '.bundle'; // 默认扩展名
+    
+    const platformJsDir = path.join(exportDir, '_expo', 'static', 'js', platform);
+    
+    if (fs.existsSync(platformJsDir)) {
+      // 新版 Expo - 查找所有 .js 或 .hbc 文件，选择最大的（主 bundle）
+      // .hbc 是 Hermes bytecode 文件
+      const jsFiles = fs.readdirSync(platformJsDir)
+        .filter(f => f.endsWith('.js') || f.endsWith('.hbc'))
+        .map(f => ({
+          name: f,
+          path: path.join(platformJsDir, f),
+          size: fs.statSync(path.join(platformJsDir, f)).size
+        }))
+        .sort((a, b) => b.size - a.size); // 按大小降序
+      
+      if (jsFiles.length > 0) {
+        sourceBundlePath = jsFiles[0].path;
+        // 如果是 Hermes bytecode，保留 .hbc 扩展名
+        if (jsFiles[0].name.endsWith('.hbc')) {
+          bundleExtension = '.hbc';
+        }
+        processSpinner.text = `找到 bundle: ${jsFiles[0].name} (${(jsFiles[0].size / 1024 / 1024).toFixed(2)} MB)`;
+      }
+    }
+    
+    const bundleFileName = `index.${platform}${bundleExtension}`;
     const targetBundlePath = path.join(outputDir, bundleFileName);
-
-    // 如果找到了 bundle 文件，复制到目标位置
-    if (fs.existsSync(expoBundlePath)) {
-      fs.copyFileSync(expoBundlePath, targetBundlePath);
-    } else {
-      // 尝试其他可能的路径
-      const altPath = path.join(exportDir, `${platform}-bundle`);
-      if (fs.existsSync(altPath)) {
-        fs.copyFileSync(altPath, targetBundlePath);
-      } else {
-        throw new Error('找不到导出的 bundle 文件');
+    
+    // 如果新版路径找不到，尝试旧版 Expo 路径
+    if (!sourceBundlePath) {
+      const oldPaths = [
+        path.join(exportDir, 'bundles', bundleFileName),
+        path.join(exportDir, '_expo', 'static', 'js', `${platform}-index.js`),
+        path.join(exportDir, `${platform}-bundle`),
+      ];
+      
+      for (const possiblePath of oldPaths) {
+        if (fs.existsSync(possiblePath)) {
+          sourceBundlePath = possiblePath;
+          break;
+        }
       }
     }
 
+    if (!sourceBundlePath) {
+      processSpinner.stop();
+      // 列出导出目录的内容以帮助调试
+      console.log(chalk.yellow('\n导出目录内容：'));
+      const listDir = (dir, indent = '') => {
+        if (fs.existsSync(dir)) {
+          const items = fs.readdirSync(dir);
+          items.forEach(item => {
+            const fullPath = path.join(dir, item);
+            const stats = fs.statSync(fullPath);
+            console.log(chalk.gray(`${indent}- ${item}${stats.isDirectory() ? '/' : ''}`));
+            if (stats.isDirectory() && indent.length < 8) {
+              listDir(fullPath, indent + '  ');
+            }
+          });
+        }
+      };
+      listDir(exportDir);
+      throw new Error('找不到导出的 bundle 文件，请检查上面的目录结构');
+    }
+    
+    // 复制 bundle 文件
+    fs.copyFileSync(sourceBundlePath, targetBundlePath);
+
     const size = (fs.statSync(targetBundlePath).size / 1024 / 1024).toFixed(2);
-    spinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (${size} MB)`));
+    processSpinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (${size} MB)`));
 
     // 打包 bundle + assets 成 zip
-    spinner.start('正在打包 bundle 和 assets...');
+    const zipSpinner = ora('正在打包 bundle 和 assets...').start();
     const assetsPath = path.join(exportDir, 'assets');
     const { zipPath, zipSize } = await packBundleToZip(targetBundlePath, assetsPath, outputDir, platform);
-    spinner.succeed(chalk.green(`打包完成: bundle-${platform}.zip (${zipSize} MB)`));
+    zipSpinner.succeed(chalk.green(`打包完成: bundle-${platform}.zip (${zipSize} MB)`));
 
     return {
       bundlePath: targetBundlePath,
@@ -227,7 +294,93 @@ async function buildExpoBundle(options) {
 }
 
 /**
- * 构建 Android APK
+ * 构建 Expo Android APK (使用 EAS Build)
+ */
+async function buildExpoAPK({ projectPath, output, buildType }) {
+  const spinner = ora('🤖 构建 Expo Android APK (使用 EAS Build)...').start();
+
+  try {
+    // 检查是否有 eas.json 配置文件
+    const easConfigPath = path.join(projectPath, 'eas.json');
+    if (!fs.existsSync(easConfigPath)) {
+      throw new Error('找不到 eas.json 配置文件，请先运行 "eas build:configure"');
+    }
+
+    spinner.text = '正在使用 EAS Build 构建 APK（这可能需要几分钟）...';
+
+    // 使用 EAS Build 本地构建
+    const profile = buildType === 'release' ? 'production' : 'development';
+    const command = `cd "${projectPath}" && eas build -p android --profile ${profile} --local --non-interactive`;
+
+    spinner.stop();
+    console.log(chalk.cyan(`\n正在使用 EAS Build 构建 APK...\n`));
+    console.log(chalk.gray(`命令: eas build -p android --profile ${profile} --local\n`));
+    execSync(command, { stdio: 'inherit' });
+    console.log();
+    
+    const resultSpinner = ora('查找构建产物...').start();
+
+    // EAS Build 通常会在项目根目录生成 APK
+    // 查找最新的 .apk 文件
+    const possiblePaths = [
+      projectPath,
+      path.join(projectPath, 'build'),
+    ];
+
+    let sourceApk = null;
+    for (const searchPath of possiblePaths) {
+      if (!fs.existsSync(searchPath)) continue;
+      
+      const files = fs.readdirSync(searchPath);
+      const apkFiles = files.filter(f => f.endsWith('.apk')).sort((a, b) => {
+        const statA = fs.statSync(path.join(searchPath, a));
+        const statB = fs.statSync(path.join(searchPath, b));
+        return statB.mtimeMs - statA.mtimeMs; // 最新的在前
+      });
+
+      if (apkFiles.length > 0) {
+        sourceApk = path.join(searchPath, apkFiles[0]);
+        break;
+      }
+    }
+
+    if (!sourceApk) {
+      throw new Error('未找到生成的 APK 文件，请检查 EAS Build 输出');
+    }
+
+    const apkSize = (fs.statSync(sourceApk).size / 1024 / 1024).toFixed(2);
+
+    let outputPath = output;
+    if (!outputPath) {
+      const buildDir = path.join(projectPath, 'build');
+      if (!fs.existsSync(buildDir)) {
+        fs.mkdirSync(buildDir, { recursive: true });
+      }
+      outputPath = path.join(buildDir, `app-${buildType}.apk`);
+    }
+
+    // 如果源文件和目标文件不同，则复制
+    if (sourceApk !== outputPath) {
+      fs.copyFileSync(sourceApk, outputPath);
+    }
+
+    resultSpinner.succeed(chalk.green(`APK 构建完成 (${apkSize} MB)`));
+    console.log(chalk.gray(`输出文件: ${outputPath}`));
+    console.log(chalk.gray('═══════════════════════════════════════════════════════\n'));
+
+    return outputPath;
+
+  } catch (error) {
+    console.log(chalk.red('✖ APK 构建失败'));
+    if (error.stderr) {
+      console.error(chalk.gray(error.stderr.toString()));
+    }
+    throw error;
+  }
+}
+
+/**
+ * 构建 React Native Android APK
  */
 async function buildAndroidAPK({ projectPath, output, buildType }) {
   const spinner = ora('🤖 构建 Android APK...').start();
@@ -248,23 +401,26 @@ async function buildAndroidAPK({ projectPath, output, buildType }) {
       execSync(`chmod +x "${gradlewPath}"`, { stdio: 'pipe' });
     }
 
-    spinner.text = '正在清理旧的构建文件...';
+    spinner.stop();
+    console.log(chalk.cyan('\n正在清理旧的构建文件...\n'));
     
     // 先执行 clean
     const cleanCommand = process.platform === 'win32'
       ? `cd "${androidDir}" && gradlew.bat clean`
       : `cd "${androidDir}" && ./gradlew clean`;
     
-    execSync(cleanCommand, { stdio: 'pipe' });
+    execSync(cleanCommand, { stdio: 'inherit' });
 
-    spinner.text = '正在编译 APK（这可能需要几分钟）...';
+    console.log(chalk.cyan('\n正在编译 APK（这可能需要几分钟）...\n'));
 
     const gradleCommand = buildType === 'release' ? 'assembleRelease' : 'assembleDebug';
     const command = process.platform === 'win32'
       ? `cd "${androidDir}" && gradlew.bat ${gradleCommand}`
       : `cd "${androidDir}" && ./gradlew ${gradleCommand}`;
 
-    execSync(command, { stdio: 'pipe' });
+    execSync(command, { stdio: 'inherit' });
+    
+    console.log(); // 换行
 
     const apkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', buildType);
     const apkFiles = fs.readdirSync(apkDir).filter(f => f.endsWith('.apk'));
@@ -287,14 +443,14 @@ async function buildAndroidAPK({ projectPath, output, buildType }) {
 
     fs.copyFileSync(sourceApk, outputPath);
 
-    spinner.succeed(chalk.green(`APK 构建完成 (${apkSize} MB)`));
+    console.log(chalk.green(`✔ APK 构建完成 (${apkSize} MB)`));
     console.log(chalk.gray(`输出文件: ${outputPath}`));
     console.log(chalk.gray('═══════════════════════════════════════════════════════\n'));
 
     return outputPath;
 
   } catch (error) {
-    spinner.fail(chalk.red('APK 构建失败'));
+    console.log(chalk.red('✖ APK 构建失败'));
     if (error.stderr) {
       console.error(chalk.gray(error.stderr.toString()));
     }
@@ -303,7 +459,96 @@ async function buildAndroidAPK({ projectPath, output, buildType }) {
 }
 
 /**
- * 构建 iOS IPA
+ * 构建 Expo iOS IPA (使用 EAS Build)
+ */
+async function buildExpoIPA({ projectPath, output, buildType }) {
+  const spinner = ora('🍎 构建 Expo iOS IPA (使用 EAS Build)...').start();
+
+  try {
+    // 检查是否在 macOS 上
+    if (process.platform !== 'darwin') {
+      throw new Error('IPA 构建仅支持在 macOS 上进行');
+    }
+
+    // 检查是否有 eas.json 配置文件
+    const easConfigPath = path.join(projectPath, 'eas.json');
+    if (!fs.existsSync(easConfigPath)) {
+      throw new Error('找不到 eas.json 配置文件，请先运行 "eas build:configure"');
+    }
+
+    spinner.text = '正在使用 EAS Build 构建 IPA（这可能需要几分钟）...';
+
+    // 使用 EAS Build 本地构建
+    const profile = buildType === 'release' ? 'production' : 'development';
+    const command = `cd "${projectPath}" && eas build -p ios --profile ${profile} --local --non-interactive`;
+
+    spinner.stop();
+    console.log(chalk.gray(`正在执行: eas build -p ios --profile ${profile} --local\n`));
+    execSync(command, { stdio: 'inherit' });
+    console.log();
+    spinner.start('查找构建产物...');
+
+    // EAS Build 通常会在项目根目录生成 IPA
+    // 查找最新的 .ipa 文件
+    const possiblePaths = [
+      projectPath,
+      path.join(projectPath, 'build'),
+    ];
+
+    let sourceIpa = null;
+    for (const searchPath of possiblePaths) {
+      if (!fs.existsSync(searchPath)) continue;
+      
+      const files = fs.readdirSync(searchPath);
+      const ipaFiles = files.filter(f => f.endsWith('.ipa')).sort((a, b) => {
+        const statA = fs.statSync(path.join(searchPath, a));
+        const statB = fs.statSync(path.join(searchPath, b));
+        return statB.mtimeMs - statA.mtimeMs; // 最新的在前
+      });
+
+      if (ipaFiles.length > 0) {
+        sourceIpa = path.join(searchPath, ipaFiles[0]);
+        break;
+      }
+    }
+
+    if (!sourceIpa) {
+      throw new Error('未找到生成的 IPA 文件，请检查 EAS Build 输出');
+    }
+
+    const ipaSize = (fs.statSync(sourceIpa).size / 1024 / 1024).toFixed(2);
+
+    let outputPath = output;
+    if (!outputPath) {
+      const buildDir = path.join(projectPath, 'build');
+      if (!fs.existsSync(buildDir)) {
+        fs.mkdirSync(buildDir, { recursive: true });
+      }
+      outputPath = path.join(buildDir, `app-${buildType}.ipa`);
+    }
+
+    // 如果源文件和目标文件不同，则复制
+    if (sourceIpa !== outputPath) {
+      fs.copyFileSync(sourceIpa, outputPath);
+    }
+
+    spinner.succeed(chalk.green(`IPA 构建完成 (${ipaSize} MB)`));
+    console.log(chalk.gray(`输出文件: ${outputPath}`));
+    console.log(chalk.gray('═══════════════════════════════════════════════════════\n'));
+
+    return outputPath;
+
+  } catch (error) {
+    spinner.fail(chalk.red('IPA 构建失败'));
+    if (error.stderr) {
+      console.error(chalk.gray(error.stderr.toString()));
+    }
+    throw error;
+  }
+}
+
+/**
+ * 构建 React Native iOS IPA
  */
 async function buildIOSIPA({ projectPath, output, buildType }) {
   const spinner = ora('🍎 构建 iOS IPA...').start();
@@ -435,21 +680,58 @@ async function buildCommand(options) {
   console.log(chalk.gray('═══════════════════════════════════════════════════════\n'));
 
   try {
+    // 检测项目类型并更新版本号
+    const projectType = detectProjectType(projectPath);
+    const version = getAppVersion(projectPath);
+    const versionCode = versionToVersionCode(version);
+    
+    console.log(`项目类型: ${chalk.green(projectType)}`);
+    console.log(`项目路径: ${chalk.green(projectPath)}`);
+    console.log(`当前版本: ${chalk.green(version)} (versionCode: ${versionCode})`);
+    console.log(chalk.gray('正在更新版本号...'));
+    
+    // 更新应用版本号和构建号（同步操作，不使用 spinner 避免阻塞）
+    const updateResult = updateAppVersion(projectPath, version, projectType);
+    
+    if (updateResult.success) {
+      console.log(chalk.green(`✔ 版本号已更新: ${version} (versionCode: ${versionCode})`));
+      if (updateResult.updated.length > 0) {
+        console.log(chalk.gray(`  已更新: ${updateResult.updated.join(', ')}`));
+      }
+    } else {
+      console.log(chalk.yellow(`⚠ 未能更新版本号配置文件`));
+    }
+    
+    console.log(chalk.gray('\n═══════════════════════════════════════════════════════\n'));
+
     if (type === 'apk') {
       // 构建 APK
       const buildType = debug ? 'debug' : 'release';
-      const apkPath = await buildAndroidAPK({ projectPath, output, buildType });
+      console.log(`构建类型: ${chalk.green(buildType.toUpperCase())}`);
+      console.log(chalk.gray('\n═══════════════════════════════════════════════════════\n'));
+      
+      let apkPath;
+      if (projectType === 'expo') {
+        apkPath = await buildExpoAPK({ projectPath, output, buildType });
+      } else {
+        apkPath = await buildAndroidAPK({ projectPath, output, buildType });
+      }
       return apkPath;
     } else if (type === 'ipa') {
       // 构建 IPA
       const buildType = debug ? 'debug' : 'release';
-      const ipaPath = await buildIOSIPA({ projectPath, output, buildType });
+      console.log(`构建类型: ${chalk.green(buildType.toUpperCase())}`);
+      console.log(chalk.gray('\n═══════════════════════════════════════════════════════\n'));
+      
+      let ipaPath;
+      if (projectType === 'expo') {
+        ipaPath = await buildExpoIPA({ projectPath, output, buildType });
+      } else {
+        ipaPath = await buildIOSIPA({ projectPath, output, buildType });
+      }
       return ipaPath;
     } else {
       // 构建 Bundle
-      const projectType = detectProjectType(projectPath);
-      console.log(`项目类型: ${chalk.green(projectType)}`);
-      console.log(`项目路径: ${chalk.green(projectPath)}`);
       console.log(`平台: ${chalk.green(platform.toUpperCase())}`);
       console.log(`入口文件: ${chalk.green(entry)}`);
 
