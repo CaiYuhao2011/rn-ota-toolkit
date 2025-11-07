@@ -55,9 +55,12 @@ function cleanMetroCache() {
 /**
  * 打包 bundle 和 assets 成 zip
  */
-async function packBundleToZip(bundlePath, assetsPath, outputDir, platform) {
+async function packBundleToZip(bundlePath, assetsPath, outputDir, platform, appName, version) {
   return new Promise((resolve, reject) => {
-    const zipPath = path.join(outputDir, `bundle-${platform}.zip`);
+    // 生成文件名：appName_v1_0_0_ota.zip
+    const versionStr = version.replace(/\./g, '_');
+    const zipFileName = `${appName}_v${versionStr}_ota.zip`;
+    const zipPath = path.join(outputDir, zipFileName);
     const output = fs.createWriteStream(zipPath);
     const archive = archiver('zip', { zlib: { level: 9 } });
 
@@ -93,7 +96,7 @@ async function packBundleToZip(bundlePath, assetsPath, outputDir, platform) {
  * 构建 React Native Bundle
  */
 async function buildReactNativeBundle(options) {
-  const { projectPath, platform, outputDir, entryFile } = options;
+  const { projectPath, platform, outputDir, entryFile, appName, version } = options;
 
   const spinner = ora(`构建 ${platform === 'ios' ? 'iOS' : 'Android'} Bundle...`).start();
 
@@ -141,8 +144,9 @@ async function buildReactNativeBundle(options) {
 
     // 打包 bundle + assets 成 zip
     const zipSpinner = ora('正在打包 bundle 和 assets...').start();
-    const { zipPath, zipSize } = await packBundleToZip(bundleOutput, assetsOutput, outputDir, platform);
-    zipSpinner.succeed(chalk.green(`打包完成: bundle-${platform}.zip (${zipSize} MB)`));
+    const { zipPath, zipSize } = await packBundleToZip(bundleOutput, assetsOutput, outputDir, platform, appName, version);
+    const zipFileName = path.basename(zipPath);
+    zipSpinner.succeed(chalk.green(`打包完成: ${zipFileName} (${zipSize} MB)`));
 
     return {
       bundlePath: bundleOutput,
@@ -162,7 +166,7 @@ async function buildReactNativeBundle(options) {
  * 构建 Expo Bundle
  */
 async function buildExpoBundle(options) {
-  const { projectPath, platform, outputDir } = options;
+  const { projectPath, platform, outputDir, appName, version } = options;
 
   const spinner = ora(`构建 Expo ${platform === 'ios' ? 'iOS' : 'Android'} Bundle...`).start();
 
@@ -276,8 +280,9 @@ async function buildExpoBundle(options) {
     // 打包 bundle + assets 成 zip
     const zipSpinner = ora('正在打包 bundle 和 assets...').start();
     const assetsPath = path.join(exportDir, 'assets');
-    const { zipPath, zipSize } = await packBundleToZip(targetBundlePath, assetsPath, outputDir, platform);
-    zipSpinner.succeed(chalk.green(`打包完成: bundle-${platform}.zip (${zipSize} MB)`));
+    const { zipPath, zipSize } = await packBundleToZip(targetBundlePath, assetsPath, outputDir, platform, appName, version);
+    const zipFileName = path.basename(zipPath);
+    zipSpinner.succeed(chalk.green(`打包完成: ${zipFileName} (${zipSize} MB)`));
 
     return {
       bundlePath: targetBundlePath,
@@ -296,7 +301,7 @@ async function buildExpoBundle(options) {
 /**
  * 构建 Expo Android APK (使用 EAS Build)
  */
-async function buildExpoAPK({ projectPath, output, buildType }) {
+async function buildExpoAPK({ projectPath, output, buildType, appName, version }) {
   const spinner = ora('🤖 构建 Expo Android APK (使用 EAS Build)...').start();
 
   try {
@@ -304,6 +309,25 @@ async function buildExpoAPK({ projectPath, output, buildType }) {
     const easConfigPath = path.join(projectPath, 'eas.json');
     if (!fs.existsSync(easConfigPath)) {
       throw new Error('找不到 eas.json 配置文件，请先运行 "eas build:configure"');
+    }
+
+    // 检查并执行 prebuild（确保 Config Plugins 生效）
+    const androidDir = path.join(projectPath, 'android');
+    const pluginsDir = path.join(projectPath, 'plugins');
+    
+    // 如果存在 plugins 目录，执行 prebuild 以确保插件生效
+    if (fs.existsSync(pluginsDir)) {
+      spinner.stop();
+      console.log(chalk.cyan('\n正在执行 expo prebuild（应用 Config Plugins）...\n'));
+      const prebuildCommand = `cd "${projectPath}" && npx expo prebuild -p android --no-install`;
+      try {
+        execSync(prebuildCommand, { stdio: 'inherit' });
+        console.log(chalk.green('\n✔ expo prebuild 完成\n'));
+      } catch (err) {
+        // 如果 prebuild 失败，继续尝试构建（可能已经 prebuild 过了）
+        console.log(chalk.yellow('\n⚠ expo prebuild 失败，继续尝试构建...\n'));
+      }
+      spinner.start('正在使用 EAS Build 构建 APK...');
     }
 
     spinner.text = '正在使用 EAS Build 构建 APK（这可能需要几分钟）...';
@@ -350,18 +374,32 @@ async function buildExpoAPK({ projectPath, output, buildType }) {
 
     const apkSize = (fs.statSync(sourceApk).size / 1024 / 1024).toFixed(2);
 
+    // 生成 APK 文件名：appName_v1_0_0.apk
+    const versionStr = version.replace(/\./g, '_');
+    const apkFileName = `${appName}_v${versionStr}.apk`;
+
     let outputPath = output;
     if (!outputPath) {
       const buildDir = path.join(projectPath, 'build');
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
-      outputPath = path.join(buildDir, `app-${buildType}.apk`);
+      outputPath = path.join(buildDir, apkFileName);
     }
 
     // 如果源文件和目标文件不同，则复制
     if (sourceApk !== outputPath) {
       fs.copyFileSync(sourceApk, outputPath);
+    }
+    
+    // 清理临时的 build 目录中的 APK（如果存在）
+    if (sourceApk !== outputPath) {
+      try {
+        fs.unlinkSync(sourceApk);
+        console.log(chalk.gray(`已清理临时文件: ${sourceApk}`));
+      } catch (err) {
+        // 忽略清理失败
+      }
     }
 
     resultSpinner.succeed(chalk.green(`APK 构建完成 (${apkSize} MB)`));
@@ -382,7 +420,7 @@ async function buildExpoAPK({ projectPath, output, buildType }) {
 /**
  * 构建 React Native Android APK
  */
-async function buildAndroidAPK({ projectPath, output, buildType }) {
+async function buildAndroidAPK({ projectPath, output, buildType, appName, version }) {
   const spinner = ora('🤖 构建 Android APK...').start();
 
   try {
@@ -432,13 +470,17 @@ async function buildAndroidAPK({ projectPath, output, buildType }) {
     const sourceApk = path.join(apkDir, apkFiles[0]);
     const apkSize = (fs.statSync(sourceApk).size / 1024 / 1024).toFixed(2);
 
+    // 生成 APK 文件名：appName_v1_0_0.apk
+    const versionStr = version.replace(/\./g, '_');
+    const apkFileName = `${appName}_v${versionStr}.apk`;
+
     let outputPath = output;
     if (!outputPath) {
       const buildDir = path.join(projectPath, 'build');
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
-      outputPath = path.join(buildDir, `app-${buildType}.apk`);
+      outputPath = path.join(buildDir, apkFileName);
     }
 
     fs.copyFileSync(sourceApk, outputPath);
@@ -461,7 +503,7 @@ async function buildAndroidAPK({ projectPath, output, buildType }) {
 /**
  * 构建 Expo iOS IPA (使用 EAS Build)
  */
-async function buildExpoIPA({ projectPath, output, buildType }) {
+async function buildExpoIPA({ projectPath, output, buildType, appName, version }) {
   const spinner = ora('🍎 构建 Expo iOS IPA (使用 EAS Build)...').start();
 
   try {
@@ -474,6 +516,25 @@ async function buildExpoIPA({ projectPath, output, buildType }) {
     const easConfigPath = path.join(projectPath, 'eas.json');
     if (!fs.existsSync(easConfigPath)) {
       throw new Error('找不到 eas.json 配置文件，请先运行 "eas build:configure"');
+    }
+
+    // 检查并执行 prebuild（确保 Config Plugins 生效）
+    const iosDir = path.join(projectPath, 'ios');
+    const pluginsDir = path.join(projectPath, 'plugins');
+    
+    // 如果存在 plugins 目录，执行 prebuild 以确保插件生效
+    if (fs.existsSync(pluginsDir)) {
+      spinner.stop();
+      console.log(chalk.cyan('\n正在执行 expo prebuild（应用 Config Plugins）...\n'));
+      const prebuildCommand = `cd "${projectPath}" && npx expo prebuild -p ios --no-install`;
+      try {
+        execSync(prebuildCommand, { stdio: 'inherit' });
+        console.log(chalk.green('\n✔ expo prebuild 完成\n'));
+      } catch (err) {
+        // 如果 prebuild 失败，继续尝试构建（可能已经 prebuild 过了）
+        console.log(chalk.yellow('\n⚠ expo prebuild 失败，继续尝试构建...\n'));
+      }
+      spinner.start('正在使用 EAS Build 构建 IPA...');
     }
 
     spinner.text = '正在使用 EAS Build 构建 IPA（这可能需要几分钟）...';
@@ -518,18 +579,32 @@ async function buildExpoIPA({ projectPath, output, buildType }) {
 
     const ipaSize = (fs.statSync(sourceIpa).size / 1024 / 1024).toFixed(2);
 
+    // 生成 IPA 文件名：appName_v1_0_0.ipa
+    const versionStr = version.replace(/\./g, '_');
+    const ipaFileName = `${appName}_v${versionStr}.ipa`;
+
     let outputPath = output;
     if (!outputPath) {
       const buildDir = path.join(projectPath, 'build');
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
-      outputPath = path.join(buildDir, `app-${buildType}.ipa`);
+      outputPath = path.join(buildDir, ipaFileName);
     }
 
     // 如果源文件和目标文件不同，则复制
     if (sourceIpa !== outputPath) {
       fs.copyFileSync(sourceIpa, outputPath);
+    }
+    
+    // 清理临时的 IPA 文件（如果存在）
+    if (sourceIpa !== outputPath) {
+      try {
+        fs.unlinkSync(sourceIpa);
+        console.log(chalk.gray(`已清理临时文件: ${sourceIpa}`));
+      } catch (err) {
+        // 忽略清理失败
+      }
     }
 
     spinner.succeed(chalk.green(`IPA 构建完成 (${ipaSize} MB)`));
@@ -550,7 +625,7 @@ async function buildExpoIPA({ projectPath, output, buildType }) {
 /**
  * 构建 React Native iOS IPA
  */
-async function buildIOSIPA({ projectPath, output, buildType }) {
+async function buildIOSIPA({ projectPath, output, buildType, appName, version }) {
   const spinner = ora('🍎 构建 iOS IPA...').start();
 
   try {
@@ -620,13 +695,17 @@ async function buildIOSIPA({ projectPath, output, buildType }) {
     const sourceIpa = path.join(exportPath, ipaFiles[0]);
     const ipaSize = (fs.statSync(sourceIpa).size / 1024 / 1024).toFixed(2);
 
+    // 生成 IPA 文件名：appName_v1_0_0.ipa
+    const versionStr = version.replace(/\./g, '_');
+    const ipaFileName = `${appName}_v${versionStr}.ipa`;
+
     let outputPath = output;
     if (!outputPath) {
       const buildDir = path.join(projectPath, 'build');
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
-      outputPath = path.join(buildDir, `app-${buildType}.ipa`);
+      outputPath = path.join(buildDir, ipaFileName);
     }
 
     fs.copyFileSync(sourceIpa, outputPath);
@@ -685,8 +764,14 @@ async function buildCommand(options) {
     const version = getAppVersion(projectPath);
     const versionCode = versionToVersionCode(version);
     
+    // 从 package.json 获取 appName
+    const packageJsonPath = path.join(projectPath, 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    const appName = packageJson.name || 'app';
+    
     console.log(`项目类型: ${chalk.green(projectType)}`);
     console.log(`项目路径: ${chalk.green(projectPath)}`);
+    console.log(`应用名称: ${chalk.green(appName)}`);
     console.log(`当前版本: ${chalk.green(version)} (versionCode: ${versionCode})`);
     console.log(chalk.gray('正在更新版本号...'));
     
@@ -712,9 +797,9 @@ async function buildCommand(options) {
       
       let apkPath;
       if (projectType === 'expo') {
-        apkPath = await buildExpoAPK({ projectPath, output, buildType });
+        apkPath = await buildExpoAPK({ projectPath, output, buildType, appName, version });
       } else {
-        apkPath = await buildAndroidAPK({ projectPath, output, buildType });
+        apkPath = await buildAndroidAPK({ projectPath, output, buildType, appName, version });
       }
       return apkPath;
     } else if (type === 'ipa') {
@@ -725,9 +810,9 @@ async function buildCommand(options) {
       
       let ipaPath;
       if (projectType === 'expo') {
-        ipaPath = await buildExpoIPA({ projectPath, output, buildType });
+        ipaPath = await buildExpoIPA({ projectPath, output, buildType, appName, version });
       } else {
-        ipaPath = await buildIOSIPA({ projectPath, output, buildType });
+        ipaPath = await buildIOSIPA({ projectPath, output, buildType, appName, version });
       }
       return ipaPath;
     } else {
@@ -743,7 +828,9 @@ async function buildCommand(options) {
         projectPath,
         platform,
         outputDir,
-        entryFile: entry
+        entryFile: entry,
+        appName,
+        version
       };
 
       let result;

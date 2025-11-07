@@ -3,10 +3,12 @@ package com.ota.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ota.common.Result;
 import com.ota.dto.UploadRequest;
+import com.ota.entity.AppVersion;
 import com.ota.entity.Version;
 import com.ota.service.OtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -66,15 +68,24 @@ public class OtaController {
      * 获取最新版本
      */
     @GetMapping("/latest")
-    public Result<Version> getLatestVersion(
+    public Result<AppVersion> getLatestVersion(
             @RequestParam String appName,
             @RequestParam String platform) {
-
         try {
             log.info("获取最新版本: appName={}, platform={}", appName, platform);
-
             Version latestVersion = otaService.getLatestVersion(appName, platform);
-            return Result.ok(latestVersion);
+            // 将 lastestVersion 转换为 AppVersion
+            AppVersion version = new AppVersion();
+            BeanUtils.copyProperties(latestVersion, version, AppVersion.class);
+            // 设置兼容属性
+            version.setRemark(latestVersion.getDescription());
+            // 设置 Platform，这一段特殊逻辑先保持兼容，后续删除
+            if ("android".equals(platform)) {
+                version.setPlatform("0");
+            }
+            version.setName(latestVersion.getAppName());
+            version.setDownloadLink(latestVersion.getDownloadUrl());
+            return Result.ok(version);
         } catch (Exception e) {
             log.error("获取最新版本失败", e);
             return Result.fail(e.getMessage());

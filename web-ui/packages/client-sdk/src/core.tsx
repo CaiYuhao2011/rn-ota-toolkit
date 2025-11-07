@@ -123,42 +123,37 @@ export class OTAUpdater {
     return this.showUpdate(updateInfo);
   }
 
-  private showOtaUpdateDialog(updateInfo: UpdateInfo): void {
+  private showUpdateError(error: Error, defaultMessage: string = '更新失败，请稍后重试'): void {
+    console.error('[OTA] 更新失败:', error);
     this.updateModal({
       visible: true,
-      title: '发现新版本',
-      message: `版本 ${updateInfo.version}\n${updateInfo.description || ''}`,
-      showProgress: false,
-      progress: 0,
-      confirmText: '立即更新',
-      cancelText: '稍后',
+      title: '更新失败',
+      message: error.message || defaultMessage,
+      confirmText: '确定',
+      cancelText: '',
       cancelable: true,
-      onConfirm: async () => {
-        try {
-          await this.startOtaUpdate(updateInfo);
-        } catch (error) {
-          console.error('[OTA] onConfirm 错误:', error);
-          this.updateModal({
-            visible: true,
-            title: '错误',
-            message: (error as Error).message || '启动更新失败',
-            confirmText: '确定',
-            onConfirm: () => this.updateModal({ visible: false }),
-          });
-        }
-      },
+      onConfirm: () => this.updateModal({ visible: false }),
       onCancel: () => this.updateModal({ visible: false }),
+    });
+  }
+
+  private showOtaUpdateDialog(updateInfo: UpdateInfo): void {
+    // 全自动更新：直接开始下载，不显示确认弹窗
+    console.log('[OTA] 检测到新版本，自动开始更新');
+    this.startOtaUpdate(updateInfo).catch((error) => {
+      this.showUpdateError(error);
     });
   }
 
   private async startOtaUpdate(updateInfo: UpdateInfo): Promise<void> {
     console.log('[OTA] 开始 OTA 更新');
+    const versionMessage = `版本 ${updateInfo.version}${updateInfo.description ? '\n更新日志：' + updateInfo.description : ''}`;
     this.updateModal({
       visible: true,
       title: '正在更新',
       showProgress: true,
       progress: 0,
-      message: '正在下载更新...',
+      message: `${versionMessage}\n\n正在下载更新...`,
       onConfirm: null,
       onCancel: null,
       cancelable: false,
@@ -171,68 +166,36 @@ export class OTAUpdater {
       });
       console.log('[OTA] downloadOtaUpdate 完成');
 
+      // 全自动更新：下载完成后直接重启，不显示确认弹窗
+      console.log('[OTA] 更新完成，自动重启应用');
       this.updateModal({
         visible: true,
         showProgress: false,
-        title: '更新成功',
-        message: '请重启应用以应用更新',
-        confirmText: '立即重启',
-        cancelText: '稍后',
-        cancelable: true,
-        onConfirm: () => {
-          this.updateModal({ visible: false });
-          this.restart();
-        },
-        onCancel: () => this.updateModal({ visible: false }),
-      });
-    } catch (error) {
-      console.error('[OTA] 更新失败:', error);
-      this.updateModal({
-        visible: true,
-        showProgress: false,
-        title: '更新失败',
-        message: (error as Error).message || '下载失败，请稍后重试',
-        confirmText: '确定',
+        title: '更新完成',
+        message: `${versionMessage}\n\n正在重启应用...`,
+        confirmText: '',
         cancelText: '',
-        cancelable: true,
-        onConfirm: () => this.updateModal({ visible: false }),
-        onCancel: () => this.updateModal({ visible: false }),
+        cancelable: false,
+        onConfirm: null,
+        onCancel: null,
       });
+      
+      // 延迟 500ms 让用户看到提示
+      setTimeout(() => {
+        this.updateModal({ visible: false });
+        this.restart();
+      }, 500);
+    } catch (error) {
+      this.showUpdateError(error as Error, '下载失败，请稍后重试');
     }
   }
 
   private showForceUpdateDialog(updateInfo: UpdateInfo): void {
     if (this.adapter.installApk) {
-      // Android 整包更新
-      const message = updateInfo.description
-        ? `版本 ${updateInfo.version}\n需要下载安装包进行更新\n\n${updateInfo.description}`
-        : `版本 ${updateInfo.version}\n需要下载安装包进行更新`;
-      
-      this.updateModal({
-        visible: true,
-        title: '发现新版本',
-        message: message,
-        showProgress: false,
-        progress: 0,
-        confirmText: '立即更新',
-        cancelText: '',
-        cancelable: false,
-        onConfirm: async () => {
-          try {
-            await this.startForceUpdate(updateInfo);
-          } catch (error) {
-            console.error('[OTA] 更新失败:', error);
-            this.updateModal({
-              visible: true,
-              title: '更新失败',
-              message: (error as Error).message || '下载失败，请稍后重试',
-              confirmText: '确定',
-              cancelText: '',
-              cancelable: true,
-              onConfirm: () => this.updateModal({ visible: false }),
-            });
-          }
-        },
+      // Android 整包更新 - 全自动下载并触发安装
+      console.log('[OTA] 检测到全量更新，自动开始下载安装包');
+      this.startForceUpdate(updateInfo).catch((error) => {
+        this.showUpdateError(error as Error, '下载失败，请稍后重试');
       });
     } else {
       // iOS 或其他平台，跳转应用商店
@@ -242,12 +205,13 @@ export class OTAUpdater {
   }
 
   private async startForceUpdate(updateInfo: UpdateInfo): Promise<void> {
+    const versionMessage = `版本 ${updateInfo.version}${updateInfo.description ? '\n更新日志：' + updateInfo.description : ''}`;
     this.updateModal({
       visible: true,
       title: '正在更新',
       showProgress: true,
       progress: 0,
-      message: '正在下载安装包...',
+      message: `${versionMessage}\n\n正在下载安装包...`,
       onConfirm: null,
       onCancel: null,
       cancelable: false,
@@ -259,11 +223,12 @@ export class OTAUpdater {
       });
 
       // 下载完成，等待用户确认安装
+      console.log('[OTA] APK 下载完成，等待用户确认安装');
       this.updateModal({
         visible: true,
         showProgress: false,
         title: '下载完成',
-        message: '安装包已下载完成，点击立即安装',
+        message: `${versionMessage}\n\n安装包已下载完成`,
         confirmText: '立即安装',
         cancelText: '',
         cancelable: false,
@@ -343,38 +308,56 @@ export class OTAUpdater {
 
       const extractedBundlePath = `${tempExtractDir}/${bundleFile.name}`;
 
-      // 删除旧的 bundle
-      const oldBundleExists = await this.adapter.exists(this.bundleFile);
-      if (oldBundleExists) {
-        await this.adapter.unlink(this.bundleFile);
-      }
-
-      // 删除旧的 drawable-* 目录（与 bundle 同级）
-      const drawableDirs = ['drawable-mdpi', 'drawable-hdpi', 'drawable-xhdpi', 'drawable-xxhdpi', 'drawable-xxxhdpi', 'raw'];
-      for (const dir of drawableDirs) {
-        const oldDrawableDir = `${this.bundlePath}/${dir}`;
-        const exists = await this.adapter.exists(oldDrawableDir);
-        if (exists) {
-          await this.adapter.unlink(oldDrawableDir);
-        }
-      }
-
-      // 移动新的 bundle 文件
-      await this.adapter.moveFile(extractedBundlePath, this.bundleFile);
-
-      // 移动解压目录中的 drawable-* 等资源目录到 bundle 同级目录
-      // 注意：现在 zip 中 drawable-* 已经在根目录，不在 assets 子目录中了
-      const extractedFiles = await this.adapter.readDir(tempExtractDir);
-      for (const file of extractedFiles) {
-        if (file.name && (file.name.startsWith('drawable-') || file.name === 'raw')) {
-          const from = `${tempExtractDir}/${file.name}`;
-          const to = `${this.bundlePath}/${file.name}`;
-          const fromExists = await this.adapter.exists(from);
-          if (fromExists) {
-            await this.adapter.moveFile(from, to);
+      // 清空整个 bundle 目录（删除所有旧文件和目录）
+      // 这样可以清理旧的 bundle、assets、drawable-* 等所有内容
+      // 注意：跳过临时文件（temp.zip 和 temp_extract）
+      const bundleDirExists = await this.adapter.exists(this.bundlePath);
+      if (bundleDirExists) {
+        const oldFiles = await this.adapter.readDir(this.bundlePath);
+        for (const oldFile of oldFiles) {
+          // 跳过临时文件
+          if (oldFile.name === 'temp.zip' || oldFile.name === 'temp_extract') {
+            continue;
+          }
+          
+          const oldPath = `${this.bundlePath}/${oldFile.name}`;
+          try {
+            await this.adapter.unlink(oldPath);
+          } catch (err) {
+            // 忽略删除错误，继续
           }
         }
       }
+
+      // 移动新的 bundle 文件（保留原始文件名，包括 .hbc 扩展名）
+      const targetBundlePath = `${this.bundlePath}/${bundleFile.name}`;
+      console.log('[OTA] 移动 bundle 文件:', extractedBundlePath, '→', targetBundlePath);
+      await this.adapter.moveFile(extractedBundlePath, targetBundlePath);
+      console.log('[OTA] bundle 文件移动成功');
+
+      // 移动所有资源文件
+      // Expo: 扁平化的哈希文件名（assets）
+      // RN: drawable-*/raw 目录
+      const extractedFiles = await this.adapter.readDir(tempExtractDir);
+      console.log('[OTA] 解压目录文件数量:', extractedFiles.length);
+      
+      let movedCount = 0;
+      for (const file of extractedFiles) {
+        // 跳过已经移动的 bundle 文件
+        if (file.name === bundleFile.name) {
+          continue;
+        }
+        
+        // 移动所有文件和目录（assets + drawable-* + raw）
+        const from = `${tempExtractDir}/${file.name}`;
+        const to = `${this.bundlePath}/${file.name}`;
+        const fromExists = await this.adapter.exists(from);
+        if (fromExists) {
+          await this.adapter.moveFile(from, to);
+          movedCount++;
+        }
+      }
+      console.log('[OTA] 已移动', movedCount, '个资源文件');
 
       if (onProgress) {
         onProgress(0.95);

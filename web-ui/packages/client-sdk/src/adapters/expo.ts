@@ -3,9 +3,9 @@
  */
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Updates from 'expo-updates';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { unzip } from 'react-native-zip-archive';
+import RNRestart from 'react-native-restart';
 import type { OTAAdapter, DownloadOptions, DownloadResult, FileInfo } from '../types';
 
 const ExpoAdapter: OTAAdapter = {
@@ -117,13 +117,24 @@ const ExpoAdapter: OTAAdapter = {
     if (Platform.OS !== 'android') {
       throw new Error('仅支持 Android 平台');
     }
+    
+    console.log('[OTA] 开始安装 APK, path:', path);
+    
     try {
+      // 使用 getContentUriAsync 获取 content:// URI
+      const contentUri = await FileSystem.getContentUriAsync(path);
+      console.log('[OTA] 获取 content URI 成功:', contentUri);
+      
+      // 使用 IntentLauncher 打开安装界面
       await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-        data: `file://${path}`,
+        data: contentUri,
         type: 'application/vnd.android.package-archive',
-        flags: 1,
+        flags: 0x10000000 | 0x00000001 | 0x00000002, // FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
       });
+      
+      console.log('[OTA] 安装界面已打开');
     } catch (error) {
+      console.error('[OTA] 安装 APK 失败:', error);
       throw new Error(`安装 APK 失败: ${error}`);
     }
   },
@@ -132,7 +143,9 @@ const ExpoAdapter: OTAAdapter = {
    * 重启应用
    */
   restart(): void {
-    Updates.reloadAsync();
+    // 使用 react-native-restart 真正重启应用
+    // 这会触发应用完全重启，MainApplication.getJSBundleFile() 会重新执行
+    RNRestart.restart();
   },
 };
 
