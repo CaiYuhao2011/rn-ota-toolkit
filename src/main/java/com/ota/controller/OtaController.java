@@ -74,6 +74,9 @@ public class OtaController {
         try {
             log.info("获取最新版本: appName={}, platform={}", appName, platform);
             Version latestVersion = otaService.getLatestVersion(appName, platform);
+            if (latestVersion == null) {
+                return Result.ok();
+            }
             // 将 lastestVersion 转换为 AppVersion
             AppVersion version = new AppVersion();
             BeanUtils.copyProperties(latestVersion, version, AppVersion.class);
