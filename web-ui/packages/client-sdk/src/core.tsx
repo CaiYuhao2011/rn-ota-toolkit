@@ -129,11 +129,12 @@ export class OTAUpdater {
       visible: true,
       title: '更新失败',
       message: error.message || defaultMessage,
-      confirmText: '确定',
-      cancelText: '',
-      cancelable: true,
+      showProgress: false,
+      confirmText: '知道了',
+      cancelText: '取消',
+      cancelable: false,
       onConfirm: () => this.updateModal({ visible: false }),
-      onCancel: () => this.updateModal({ visible: false }),
+      onCancel: null,
     });
   }
 
@@ -154,9 +155,11 @@ export class OTAUpdater {
       showProgress: true,
       progress: 0,
       message: `${versionMessage}\n\n正在下载更新...`,
+      confirmText: '下载更新',
+      cancelText: '取消',
+      cancelable: false,
       onConfirm: null,
       onCancel: null,
-      cancelable: false,
     });
 
     try {
@@ -173,8 +176,8 @@ export class OTAUpdater {
         showProgress: false,
         title: '更新完成',
         message: `${versionMessage}\n\n正在重启应用...`,
-        confirmText: '',
-        cancelText: '',
+        confirmText: '重启应用',
+        cancelText: '取消',
         cancelable: false,
         onConfirm: null,
         onCancel: null,
@@ -212,9 +215,11 @@ export class OTAUpdater {
       showProgress: true,
       progress: 0,
       message: `${versionMessage}\n\n正在下载安装包...`,
+      confirmText: '下载更新',
+      cancelText: '取消',
+      cancelable: false,
       onConfirm: null,
       onCancel: null,
-      cancelable: false,
     });
 
     try {
@@ -230,7 +235,7 @@ export class OTAUpdater {
         title: '下载完成',
         message: `${versionMessage}\n\n安装包已下载完成`,
         confirmText: '立即安装',
-        cancelText: '',
+        cancelText: '取消',
         cancelable: false,
         onConfirm: async () => {
           this.updateModal({ visible: false });

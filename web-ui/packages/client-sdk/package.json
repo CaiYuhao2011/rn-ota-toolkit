@@ -1,6 +1,6 @@
 {
   "name": "rn-ota-client",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "React Native OTA 客户端 SDK（仅支持原生项目，不支持 Expo Managed）",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
