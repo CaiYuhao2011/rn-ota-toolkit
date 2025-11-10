@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  # OTA Server
+  ota-server:
+    build: 
+      context: jiafusz/ota
+      dockerfile: Dockerfile
+    container_name: ota-server
+    restart: unless-stopped
+    environment:
+      # 时区上海
+      TZ: Asia/Shanghai
+      DATABASE_URL: jdbc:mysql://localhost:3306/disapp?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: jiafusz666
+      MINIO_ENDPOINT: http://localhost:9000
+      MINIO_ACCESS_KEY: jiafusz
+      MINIO_SECRET_KEY: jiafusz666
+      MINIO_BUCKET: jiafusz
+    ports:
+      - "10080:10080"
+    privileged: true
+    network_mode: host
+    volumes:
+      # 配置文件
+      - ./ota/logs/:/home/jiafusz/ota/logs/ota/
+      # skywalking 探针
+      # - ./skywalking/agent/:/home/jiafusz/skywalking/agent

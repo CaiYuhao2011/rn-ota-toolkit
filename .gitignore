@@ -73,3 +73,5 @@ logs/
 .DS_Store
 
 server.yml
+
+*.jar
