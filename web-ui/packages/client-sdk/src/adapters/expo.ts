@@ -5,17 +5,22 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { unzip } from 'react-native-zip-archive';
-import RNRestart from 'react-native-restart';
-import type { OTAAdapter, DownloadOptions, DownloadResult, FileInfo } from '../types';
+import * as Updates from 'expo-updates';
+import type { OTAAdapter, DownloadOptions, DownloadResult, FileInfo, UpdateInfo } from '../types';
 
 const ExpoAdapter: OTAAdapter = {
   platform: Platform.OS,
+  isDownloading: false,
 
   /**
    * 获取文档目录路径
    */
   get documentDirectory(): string {
     return FileSystem.documentDirectory || '';
+  },
+
+  get bundlePath(): string {
+    return `${this.documentDirectory}bundle`;
   },
 
   /**
@@ -143,10 +148,87 @@ const ExpoAdapter: OTAAdapter = {
    * 重启应用
    */
   restart(): void {
-    // 使用 react-native-restart 真正重启应用
-    // 这会触发应用完全重启，MainApplication.getJSBundleFile() 会重新执行
-    RNRestart.restart();
+    // 下载完成后立即重启应用以应用更新
+    Updates.reloadAsync();
   },
+
+  /**
+   * 开始 OTA 更新
+   */
+  async preStartOtaUpdate() {
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      return update.isAvailable;
+    } catch (err) {
+      console.error('[OTA] 预检查失败:', err);
+      return false;
+    }
+  },
+
+  async downloadOtaUpdate(updateInfo: UpdateInfo, onProgress?: (progress: number) => void) {
+    if (this.isDownloading) {
+      throw new Error('正在下载中');
+    }
+    this.isDownloading = true;
+    console.log('[OTA] 开始下载更新...');
+    
+    // 模拟进度条（Expo Updates API 不支持真实的下载进度回调）
+    let progressInterval: NodeJS.Timeout | null = null;
+    let simulatedProgress = 0;
+    const maxSimulatedProgress = 0.9; // 最多模拟到 90%，等待真实下载完成
+    
+    if (onProgress) {
+      // 初始进度
+      onProgress(0);
+      
+      // 开始模拟进度：每 200ms 增长，逐渐减慢
+      progressInterval = setInterval(() => {
+        if (simulatedProgress < maxSimulatedProgress) {
+          // 使用递减的增长速度，让进度条看起来更自然
+          const increment = (maxSimulatedProgress - simulatedProgress) * 0.1;
+          simulatedProgress = Math.min(
+            simulatedProgress + increment,
+            maxSimulatedProgress
+          );
+          onProgress(simulatedProgress);
+        }
+      }, 200);
+    }
+    
+    try {
+      // 下载更新
+      const fetchResult = await Updates.fetchUpdateAsync();
+      
+      // 清除模拟进度的定时器
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      
+      // 立即设置进度为 100%
+      if (onProgress) {
+        onProgress(1);
+      }
+      
+      if (fetchResult.isNew) {
+        console.log('更新下载完成，准备重启应用');
+      } else {
+        console.log('[OTA] 已经是最新版');
+      }
+      return true;
+    } catch(error) {
+      // 清除模拟进度的定时器
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      
+      console.error('[OTA] 下载失败:', error);
+      throw error;
+    } finally {
+      this.isDownloading = false;
+    }
+  }
 };
 
 export default ExpoAdapter;

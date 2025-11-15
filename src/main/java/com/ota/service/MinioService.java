@@ -1,8 +1,14 @@
 package com.ota.service;
 
+import io.minio.GetObjectResponse;
+import io.minio.StatObjectResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface MinioService {
+    String getEndpoint();
+
+    String getBucketName();
+
     /**
      * 上传文件到 MinIO
      *
@@ -26,4 +32,29 @@ public interface MinioService {
      * @return 文件访问URL
      */
     String getFileUrl(String fileName);
+
+    /**
+     * 上传文件夹中的所有文件到MinIO
+     *
+     * @param basePath 基础路径
+     * @param bundle   压缩文件
+     * @return 文件夹访问URL
+     */
+    String uploadExtractedFiles(String basePath, MultipartFile bundle) throws Exception;
+    
+    /**
+     * 读取 MinIO 中的文件内容
+     *
+     * @param fileName 文件名
+     * @return 文件输入流
+     */
+    GetObjectResponse readFile(String fileName) throws Exception;
+
+    /**
+     * 获取文件状态
+     *
+     * @param fileName 文件名
+     * @return 文件状态
+     */
+    StatObjectResponse statFile(String fileName) throws Exception;
 }

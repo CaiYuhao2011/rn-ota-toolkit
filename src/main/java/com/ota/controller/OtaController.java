@@ -6,6 +6,7 @@ import com.ota.dto.UploadRequest;
 import com.ota.entity.AppVersion;
 import com.ota.entity.Version;
 import com.ota.service.OtaService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -21,6 +22,20 @@ import java.util.List;
 public class OtaController {
 
     private final OtaService otaService;
+
+    /**
+     * Expo Manifest V1 协议实现
+     * @see [custom-expo-updates-server]{https://github.com/expo/custom-expo-updates-server}
+     * @see [expo-updates]{https://docs.expo.dev/versions/latest/sdk/updates/}
+     */
+    @GetMapping("/manifest")
+    public Result<?> manifest(HttpServletRequest request) {
+        try {
+
+        } catch (Exception e) {
+            //
+        }
+    }
 
     /**
      * 上传并发布新版本

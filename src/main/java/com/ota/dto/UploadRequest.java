@@ -23,6 +23,9 @@ public class UploadRequest {
     @NotBlank(message = "更新类型不能为空")
     private String updateType;
 
+    @NotBlank(message = "框架不能为空")
+    private String framework;
+
     private String description;
     private String minAppVersion;
 }

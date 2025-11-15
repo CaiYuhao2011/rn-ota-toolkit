@@ -8,6 +8,8 @@ export interface OTAConfig {
   version: string;
   /** 开发环境服务器地址，用于替换 localhost，例如 '192.168.1.100' 或 '10.0.2.2' */
   devServerHost?: string;
+  /** 框架 */
+  framework?: 'bare' | 'expo';
 }
 
 export interface UpdateInfo {
@@ -53,7 +55,9 @@ export interface FileInfo {
 
 export interface OTAAdapter {
   platform: string;
+  isDownloading: boolean;
   documentDirectory: string;
+  bundlePath: string;
   exists(path: string): Promise<boolean>;
   mkdir(path: string): Promise<void>;
   downloadFile(options: DownloadOptions): DownloadResult;
@@ -64,5 +68,6 @@ export interface OTAAdapter {
   installApk?(path: string): Promise<void>;
   restart(): void;
   openAppStore?(url: string): void;
+  preStartOtaUpdate(updateInfo: UpdateInfo): Promise<boolean>;
+  downloadOtaUpdate(updateInfo: UpdateInfo, onProgress: (progress: number) => void): Promise<boolean>;
 }
-

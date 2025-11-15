@@ -4,6 +4,7 @@ const path = require('path');
 const chalk = require('chalk');
 const ora = require('ora');
 const archiver = require('archiver');
+const ExpoConfig = require('@expo/config');
 const { getAppVersion, updateAppVersion, versionToVersionCode } = require('../utils/project');
 
 /**
@@ -50,6 +51,43 @@ function cleanMetroCache() {
     }
   }
   return true;
+}
+
+/**
+ * 查找 hdc 文件并计算总大小
+ */
+function findHdcFilesAndCalculateSize(searchDir) {
+  let totalSize = 0;
+  const hdcFiles = [];
+
+  function searchDirectory(dir) {
+    if (!fs.existsSync(dir)) {
+      return;
+    }
+
+    try {
+      const items = fs.readdirSync(dir);
+      for (const item of items) {
+        const itemPath = path.join(dir, item);
+        const stat = fs.statSync(itemPath);
+
+        if (stat.isDirectory()) {
+          searchDirectory(itemPath);
+        } else if (stat.isFile() && item.endsWith('.hdc')) {
+          hdcFiles.push(itemPath);
+          totalSize += stat.size;
+        }
+      }
+    } catch (error) {
+      // 忽略无法访问的目录
+    }
+  }
+
+  searchDirectory(searchDir);
+  return {
+    totalSize: (totalSize / 1024 / 1024).toFixed(2),
+    files: hdcFiles
+  };
 }
 
 /**
@@ -139,8 +177,14 @@ async function buildReactNativeBundle(options) {
     
     console.log(); // 换行
     const packSpinner = ora('检查构建产物...').start();
-    const size = (fs.statSync(bundleOutput).size / 1024 / 1024).toFixed(2);
-    packSpinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (${size} MB)`));
+    // 查找 hdc 文件并计算大小
+    const hdcResult = findHdcFilesAndCalculateSize(outputDir);
+    const size = hdcResult.totalSize;
+    if (hdcResult.files.length > 0) {
+      packSpinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (找到 ${hdcResult.files.length} 个 hdc 文件, 总大小: ${size} MB)`));
+    } else {
+      packSpinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (未找到 hdc 文件)`));
+    }
 
     // 打包 bundle + assets 成 zip
     const zipSpinner = ora('正在打包 bundle 和 assets...').start();
@@ -190,105 +234,64 @@ async function buildExpoBundle(options) {
       `--output-dir "${exportDir}"`,
       '--clear'
     ].join(' ');
-
+    
     // 暂停 spinner 显示构建输出
     spinner.stop();
     console.log(chalk.cyan(`\n开始导出 Expo ${platform.toUpperCase()} Bundle...\n`));
     console.log(chalk.gray(`命令: npx expo export --platform ${platform} --clear\n`));
     
     execSync(command, { stdio: 'inherit' });
+
+    const { exp } = ExpoConfig.getConfig(projectPath, {
+      skipSDKVersionRequirement: true,
+      isPublicConfig: true,
+    });
+    fs.writeFileSync(path.join(exportDir, 'expoConfig.json'), JSON.stringify(exp, null, 2));
     
     console.log(); // 换行
-    
-    // Expo 导出的 bundle 位置（尝试多个可能的路径）
-    // 新版 Expo (SDK 50+) 的 bundle 在 _expo/static/js/{platform}/ 目录下
-    // 查找主 bundle 文件（通常是 entry-*.js 或 entry-*.hbc）
-    const processSpinner = ora('查找导出的 bundle 文件...').start();
-    let sourceBundlePath = null;
-    let bundleExtension = '.bundle'; // 默认扩展名
-    
-    const platformJsDir = path.join(exportDir, '_expo', 'static', 'js', platform);
-    
-    if (fs.existsSync(platformJsDir)) {
-      // 新版 Expo - 查找所有 .js 或 .hbc 文件，选择最大的（主 bundle）
-      // .hbc 是 Hermes bytecode 文件
-      const jsFiles = fs.readdirSync(platformJsDir)
-        .filter(f => f.endsWith('.js') || f.endsWith('.hbc'))
-        .map(f => ({
-          name: f,
-          path: path.join(platformJsDir, f),
-          size: fs.statSync(path.join(platformJsDir, f)).size
-        }))
-        .sort((a, b) => b.size - a.size); // 按大小降序
-      
-      if (jsFiles.length > 0) {
-        sourceBundlePath = jsFiles[0].path;
-        // 如果是 Hermes bytecode，保留 .hbc 扩展名
-        if (jsFiles[0].name.endsWith('.hbc')) {
-          bundleExtension = '.hbc';
-        }
-        processSpinner.text = `找到 bundle: ${jsFiles[0].name} (${(jsFiles[0].size / 1024 / 1024).toFixed(2)} MB)`;
-      }
-    }
-    
-    const bundleFileName = `index.${platform}${bundleExtension}`;
-    const targetBundlePath = path.join(outputDir, bundleFileName);
-    
-    // 如果新版路径找不到，尝试旧版 Expo 路径
-    if (!sourceBundlePath) {
-      const oldPaths = [
-        path.join(exportDir, 'bundles', bundleFileName),
-        path.join(exportDir, '_expo', 'static', 'js', `${platform}-index.js`),
-        path.join(exportDir, `${platform}-bundle`),
-      ];
-      
-      for (const possiblePath of oldPaths) {
-        if (fs.existsSync(possiblePath)) {
-          sourceBundlePath = possiblePath;
-          break;
-        }
-      }
-    }
 
-    if (!sourceBundlePath) {
-      processSpinner.stop();
-      // 列出导出目录的内容以帮助调试
-      console.log(chalk.yellow('\n导出目录内容：'));
-      const listDir = (dir, indent = '') => {
-        if (fs.existsSync(dir)) {
-          const items = fs.readdirSync(dir);
-          items.forEach(item => {
-            const fullPath = path.join(dir, item);
-            const stats = fs.statSync(fullPath);
-            console.log(chalk.gray(`${indent}- ${item}${stats.isDirectory() ? '/' : ''}`));
-            if (stats.isDirectory() && indent.length < 8) {
-              listDir(fullPath, indent + '  ');
-            }
-          });
-        }
-      };
-      listDir(exportDir);
-      throw new Error('找不到导出的 bundle 文件，请检查上面的目录结构');
-    }
+    // 直接将整个 exportDir 目录的内容打包成 zip
+    // 使用 archive.directory(exportDir, false) 确保解压后直接是目录内的文件，不包含 expo-export 目录名
+    const zipSpinner = ora('正在打包整个 build 目录...').start();
+    const versionStr = version.replace(/\./g, '_');
+    const zipFileName = `${appName}_v${versionStr}_ota.zip`;
+    const zipPath = path.join(outputDir, zipFileName);
     
-    // 复制 bundle 文件
-    fs.copyFileSync(sourceBundlePath, targetBundlePath);
+    const zipSize = await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(zipPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
 
-    const size = (fs.statSync(targetBundlePath).size / 1024 / 1024).toFixed(2);
-    processSpinner.succeed(chalk.green(`Bundle 构建完成: ${bundleFileName} (${size} MB)`));
+      output.on('close', () => {
+        const size = (archive.pointer() / 1024 / 1024).toFixed(2);
+        resolve(size);
+      });
 
-    // 打包 bundle + assets 成 zip
-    const zipSpinner = ora('正在打包 bundle 和 assets...').start();
-    const assetsPath = path.join(exportDir, 'assets');
-    const { zipPath, zipSize } = await packBundleToZip(targetBundlePath, assetsPath, outputDir, platform, appName, version);
-    const zipFileName = path.basename(zipPath);
+      archive.on('error', (err) => {
+        reject(err);
+      });
+
+      archive.pipe(output);
+
+      // 将整个 exportDir 目录的内容添加到 zip
+      // 第二个参数 false 表示不包含目录名本身，只打包目录内的内容
+      // 解压后直接就是 _expo、assets 等文件夹，而不是先有个 expo-export 文件夹
+      archive.directory(exportDir, false);
+
+      archive.finalize();
+    });
+
     zipSpinner.succeed(chalk.green(`打包完成: ${zipFileName} (${zipSize} MB)`));
 
+    // 查找 hdc 文件并计算大小
+    const hdcResult = findHdcFilesAndCalculateSize(exportDir);
+    const size = hdcResult.totalSize;
+
+    const assetsPath = path.join(exportDir, 'assets');
     return {
-      bundlePath: targetBundlePath,
+      bundlePath: exportDir,
       zipPath: zipPath,
       assetsPath: assetsPath,
-      size,
+      size: size,
       zipSize
     };
 

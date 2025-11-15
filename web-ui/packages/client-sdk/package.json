@@ -1,6 +1,6 @@
 {
   "name": "rn-ota-client",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "React Native OTA 客户端 SDK（仅支持原生项目，不支持 Expo Managed）",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,6 +36,7 @@
     "expo-constants": ">=0.0.0",
     "expo-file-system": "~19.0.17",
     "expo-intent-launcher": ">=10.0.0",
+    "expo-updates": ">=0.0.0",
     "react": ">=16.8.0",
     "react-native": ">=0.60.0",
     "react-native-blob-util": ">=0.13.7",
@@ -54,7 +55,7 @@
       "optional": false
     },
     "react-native-restart": {
-      "optional": false
+      "optional": true
     },
     "expo-file-system": {
       "optional": true
@@ -63,6 +64,9 @@
       "optional": true
     },
     "expo-intent-launcher": {
+      "optional": true
+    },
+    "expo-updates": {
       "optional": true
     }
   },
@@ -78,6 +82,7 @@
     "react-native-zip-archive": "^7.0.0",
     "expo-file-system": "^19.0.17",
     "expo-constants": "^16.0.0",
-    "expo-intent-launcher": "^11.0.0"
+    "expo-intent-launcher": "^11.0.0",
+    "expo-updates": "^29.0.10"
   }
 }

@@ -17,6 +17,10 @@ export class OTAUpdater {
   isDownloading: boolean;
   adapter!: OTAAdapter;
   devServerHost?: string;
+  /**
+   * 框架
+   */
+  framework?: 'bare' | 'expo';
  
   constructor(config: OTAConfig, adapter: OTAAdapter) {
     this.adapter = adapter;
@@ -24,9 +28,9 @@ export class OTAUpdater {
     this.appName = config.appName;
     this.version = config.version;
     this.devServerHost = config.devServerHost;
-    
+    this.framework = config.framework;
     this.platform = adapter.platform;
-    this.bundlePath = `${adapter.documentDirectory}bundle`;
+    this.bundlePath = this.adapter.bundlePath;
     this.bundleFile = `${this.bundlePath}/index.${this.platform}.bundle`;
     
     this.isDownloading = false;
@@ -34,7 +38,7 @@ export class OTAUpdater {
     this.init();
   }
 
-  private async init(): Promise<void> {
+  async init() {
     try {
       const exists = await this.adapter.exists(this.bundlePath);
       if (!exists) {
@@ -73,7 +77,7 @@ export class OTAUpdater {
       console.log('[OTA] 服务器返回:', result.code);
 
       if (result.code === 200 && result.data) {
-        const updateInfo = result.data;
+        const updateInfo: UpdateInfo = result.data;    
         
         // 自动显示更新弹窗
         this.showUpdate({
@@ -106,21 +110,15 @@ export class OTAUpdater {
     if (updateInfo.version <= this.version) {
       return;
     }
+    // 转换 localhost URL
+    updateInfo.downloadUrl = this.convertLocalhostUrl(updateInfo.downloadUrl);
+    console.log('[OTA] 转换后的 URL:', updateInfo.downloadUrl);
 
     if (updateInfo.type === 'force') {
       this.showForceUpdateDialog(updateInfo);
     } else {
       this.showOtaUpdateDialog(updateInfo);
     }
-  }
-
-  /**
-   * @deprecated 使用 showUpdate 代替
-   * 为保持向后兼容而保留
-   */
-  checkUpdate(updateInfo: UpdateInfo): void {
-    console.warn('[OTA] checkUpdate 已废弃，请使用 checkForUpdates() 自动检查更新，或使用 showUpdate(updateInfo) 手动显示更新');
-    return this.showUpdate(updateInfo);
   }
 
   private showUpdateError(error: Error, defaultMessage: string = '更新失败，请稍后重试'): void {
@@ -140,9 +138,13 @@ export class OTAUpdater {
 
   private showOtaUpdateDialog(updateInfo: UpdateInfo): void {
     // 全自动更新：直接开始下载，不显示确认弹窗
-    console.log('[OTA] 检测到新版本，自动开始更新');
-    this.startOtaUpdate(updateInfo).catch((error) => {
-      this.showUpdateError(error);
+    this.adapter.preStartOtaUpdate(updateInfo).then((res) => {
+      if (res) {
+        console.log('[OTA] 检测到新版本，自动开始更新');
+        this.startOtaUpdate(updateInfo).catch((error) => {
+          this.showUpdateError(error);
+        });
+      }
     });
   }
 
@@ -164,7 +166,7 @@ export class OTAUpdater {
 
     try {
       console.log('[OTA] 调用 downloadOtaUpdate');
-      await this.downloadOtaUpdate(updateInfo, (progress: number) => {
+      await this.adapter.downloadOtaUpdate(updateInfo, (progress: number) => {
         this.updateModal({ progress });
       });
       console.log('[OTA] downloadOtaUpdate 完成');
@@ -249,160 +251,6 @@ export class OTAUpdater {
     }
   }
 
-  async downloadOtaUpdate(updateInfo: UpdateInfo, onProgress?: (progress: number) => void): Promise<boolean> {
-    console.log('[OTA] downloadOtaUpdate 开始, url:', updateInfo.downloadUrl);
-    if (this.isDownloading) {
-      throw new Error('正在下载中');
-    }
-
-    this.isDownloading = true;
-
-    const tempZipFile = `${this.bundlePath}/temp.zip`;
-    const tempExtractDir = `${this.bundlePath}/temp_extract`;
-
-    try {
-      // 转换 localhost URL
-      const downloadUrl = this.convertLocalhostUrl(updateInfo.downloadUrl);
-      console.log('[OTA] 转换后的 URL:', downloadUrl);
-      
-      // 下载 zip 文件
-      console.log('[OTA] 开始下载文件到:', tempZipFile);
-      const download = this.adapter.downloadFile({
-        fromUrl: downloadUrl,
-        toFile: tempZipFile,
-        progress: (res) => {
-          if (onProgress) {
-            // 下载占 70% 进度
-            onProgress((res.bytesWritten / res.contentLength) * 0.7);
-          }
-        },
-      });
-
-      const downloadResult = await download.promise;
-
-      if (downloadResult.statusCode !== 200) {
-        throw new Error(`下载失败: HTTP ${downloadResult.statusCode}`);
-      }
-
-      // 解压 zip 文件
-      if (onProgress) {
-        onProgress(0.75);
-      }
-
-      const extractDirExists = await this.adapter.exists(tempExtractDir);
-      if (extractDirExists) {
-        await this.adapter.unlink(tempExtractDir);
-      }
-      await this.adapter.mkdir(tempExtractDir);
-
-      await this.adapter.unzipFile(tempZipFile, tempExtractDir);
-
-      if (onProgress) {
-        onProgress(0.85);
-      }
-
-      // 查找解压后的 bundle 文件（支持 .bundle 和 .hbc Hermes bytecode）
-      const files = await this.adapter.readDir(tempExtractDir);
-      const bundleFile = files.find(f => 
-        f.name && (f.name.includes('.bundle') || f.name.endsWith('.hbc'))
-      );
-      
-      if (!bundleFile) {
-        throw new Error('解压后未找到 bundle 文件（.bundle 或 .hbc）');
-      }
-
-      const extractedBundlePath = `${tempExtractDir}/${bundleFile.name}`;
-
-      // 清空整个 bundle 目录（删除所有旧文件和目录）
-      // 这样可以清理旧的 bundle、assets、drawable-* 等所有内容
-      // 注意：跳过临时文件（temp.zip 和 temp_extract）
-      const bundleDirExists = await this.adapter.exists(this.bundlePath);
-      if (bundleDirExists) {
-        const oldFiles = await this.adapter.readDir(this.bundlePath);
-        for (const oldFile of oldFiles) {
-          // 跳过临时文件
-          if (oldFile.name === 'temp.zip' || oldFile.name === 'temp_extract') {
-            continue;
-          }
-          
-          const oldPath = `${this.bundlePath}/${oldFile.name}`;
-          try {
-            await this.adapter.unlink(oldPath);
-          } catch (err) {
-            // 忽略删除错误，继续
-          }
-        }
-      }
-
-      // 移动新的 bundle 文件（保留原始文件名，包括 .hbc 扩展名）
-      const targetBundlePath = `${this.bundlePath}/${bundleFile.name}`;
-      console.log('[OTA] 移动 bundle 文件:', extractedBundlePath, '→', targetBundlePath);
-      await this.adapter.moveFile(extractedBundlePath, targetBundlePath);
-      console.log('[OTA] bundle 文件移动成功');
-
-      // 移动所有资源文件
-      // Expo: 扁平化的哈希文件名（assets）
-      // RN: drawable-*/raw 目录
-      const extractedFiles = await this.adapter.readDir(tempExtractDir);
-      console.log('[OTA] 解压目录文件数量:', extractedFiles.length);
-      
-      let movedCount = 0;
-      for (const file of extractedFiles) {
-        // 跳过已经移动的 bundle 文件
-        if (file.name === bundleFile.name) {
-          continue;
-        }
-        
-        // 移动所有文件和目录（assets + drawable-* + raw）
-        const from = `${tempExtractDir}/${file.name}`;
-        const to = `${this.bundlePath}/${file.name}`;
-        const fromExists = await this.adapter.exists(from);
-        if (fromExists) {
-          await this.adapter.moveFile(from, to);
-          movedCount++;
-        }
-      }
-      console.log('[OTA] 已移动', movedCount, '个资源文件');
-
-      if (onProgress) {
-        onProgress(0.95);
-      }
-
-      // 清理临时文件
-      await this.adapter.unlink(tempZipFile);
-      const tempDirExists = await this.adapter.exists(tempExtractDir);
-      if (tempDirExists) {
-        await this.adapter.unlink(tempExtractDir);
-      }
-
-      if (onProgress) {
-        onProgress(1);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('[OTA] 下载失败:', error);
-      
-      // 清理临时文件
-      try {
-        const zipExists = await this.adapter.exists(tempZipFile);
-        if (zipExists) {
-          await this.adapter.unlink(tempZipFile);
-        }
-        const extractDirExists = await this.adapter.exists(tempExtractDir);
-        if (extractDirExists) {
-          await this.adapter.unlink(tempExtractDir);
-        }
-      } catch (cleanupError) {
-        console.error('[OTA] 清理临时文件失败:', cleanupError);
-      }
-
-      throw error;
-    } finally {
-      this.isDownloading = false;
-    }
-  }
-
   async downloadApk(updateInfo: UpdateInfo, onProgress?: (progress: number) => void): Promise<string> {
     if (this.isDownloading) {
       throw new Error('正在下载中');
@@ -464,51 +312,6 @@ export class OTAUpdater {
       }
     } catch (error) {
       console.error('[OTA] 清除失败:', error);
-    }
-  }
-
-  /**
-   * 调试：检查 OTA 文件状态
-   * 用于排查静态资源加载问题
-   */
-  async debugOTAFiles(): Promise<{
-    bundleExists: boolean;
-    bundlePath: string;
-    drawableDirs: Record<string, boolean>;
-    bundleDirFiles?: string[];
-  }> {
-    try {
-      const bundleExists = await this.adapter.exists(this.bundleFile);
-      
-      // 检查 drawable-* 目录是否存在
-      const drawableDirs: Record<string, boolean> = {};
-      const dirs = ['drawable-mdpi', 'drawable-hdpi', 'drawable-xhdpi', 'drawable-xxhdpi', 'drawable-xxxhdpi', 'raw'];
-      for (const dir of dirs) {
-        const dirPath = `${this.bundlePath}/${dir}`;
-        drawableDirs[dir] = await this.adapter.exists(dirPath);
-      }
-      
-      // 列出 bundle 目录下的所有文件/目录
-      let bundleDirFiles: string[] = [];
-      try {
-        const files = await this.adapter.readDir(this.bundlePath);
-        bundleDirFiles = files.map(f => f.name).filter(Boolean) as string[];
-      } catch (e) {
-        bundleDirFiles = ['无法读取目录'];
-      }
-
-      const result = {
-        bundleExists,
-        bundlePath: this.bundleFile,
-        drawableDirs,
-        bundleDirFiles: bundleDirFiles.slice(0, 30),
-      };
-
-      console.log('[OTA Debug] 文件状态:', result);
-      return result;
-    } catch (error) {
-      console.error('[OTA] 调试检查失败:', error);
-      throw error;
     }
   }
 

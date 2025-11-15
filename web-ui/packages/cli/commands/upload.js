@@ -5,6 +5,32 @@ const axios = require('axios');
 const chalk = require('chalk');
 const ora = require('ora');
 
+/**
+ * 检测项目类型
+ */
+function detectProjectType(projectPath) {
+  const packageJsonPath = path.join(projectPath, 'package.json');
+  
+  if (!fs.existsSync(packageJsonPath)) {
+    throw new Error('找不到 package.json 文件');
+  }
+
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
+
+  // 检查是否为 Expo 项目
+  if (dependencies['expo']) {
+    return 'expo';
+  }
+
+  // 检查是否为 React Native 项目
+  if (dependencies['react-native']) {
+    return 'react-native';
+  }
+
+  throw new Error('不是有效的 React Native 或 Expo 项目');
+}
+
 async function uploadCommand(options) {
   const { file, app, platform, version, server, description, minAppVersion, updateType } = options;
 
@@ -35,6 +61,9 @@ async function uploadCommand(options) {
   }
   console.log(chalk.gray('─────────────────────────────────\n'));
 
+  // 检查项目类型 bare 或者 expo
+  const projectType = detectProjectType(process.cwd());
+
   try {
     // 创建表单数据
     const form = new FormData();
@@ -45,6 +74,7 @@ async function uploadCommand(options) {
     form.append('description', description || '');
     form.append('minAppVersion', minAppVersion || '0.0.0');
     form.append('updateType', updateType || 'incremental');
+    form.append('framework', projectType);
 
     // 上传
     const uploadSpinner = ora('正在上传...').start();

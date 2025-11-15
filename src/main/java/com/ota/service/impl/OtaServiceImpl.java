@@ -2,6 +2,7 @@ package com.ota.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ota.constant.FrameworkType;
 import com.ota.dto.UploadRequest;
 import com.ota.entity.Version;
 import com.ota.mapper.VersionMapper;
@@ -13,6 +14,7 @@ import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -48,6 +50,18 @@ public class OtaServiceImpl implements OtaService {
 
         // 上传文件到 MinIO
         String fileUrl = minioService.uploadFile(request.getBundle(), fileName);
+
+        // 如果是 Expo
+        if (request.getFramework().equals(FrameworkType.EXPO.getValue())) {
+            String basePath = String.format("%s/%s/%s",
+                    request.getAppName(),
+                    request.getPlatform(),
+                    request.getVersion());
+            // 解压缩文件，并上传按照文件夹上传每一个文件
+            MultipartFile bundle = request.getBundle();
+            String bundleUrl = minioService.uploadExtractedFiles(basePath, bundle);
+            log.info("Expo bundle已上传至: {}", bundleUrl);
+        }
 
         // 保存版本信息到数据库
         Version version = new Version();
