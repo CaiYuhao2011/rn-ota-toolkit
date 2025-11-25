@@ -4,6 +4,8 @@ import io.minio.GetObjectResponse;
 import io.minio.StatObjectResponse;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 public interface MinioService {
     String getEndpoint();
 
@@ -41,7 +43,7 @@ public interface MinioService {
      * @return 文件夹访问URL
      */
     String uploadExtractedFiles(String basePath, MultipartFile bundle) throws Exception;
-    
+
     /**
      * 读取 MinIO 中的文件内容
      *
@@ -57,4 +59,27 @@ public interface MinioService {
      * @return 文件状态
      */
     StatObjectResponse statFile(String fileName) throws Exception;
+
+    /**
+     * 列出指定前缀下的一级目录名称
+     *
+     * @param prefix 前缀
+     * @return 目录名称列表
+     */
+    List<String> listDirectories(String prefix) throws Exception;
+
+    /**
+     * 判断对象是否存在
+     *
+     * @param objectName 对象名称
+     * @return 是否存在
+     */
+    boolean exists(String objectName);
+
+    /**
+     * 删除指定前缀下的所有对象
+     *
+     * @param prefix 前缀
+     */
+    void deleteDirectory(String prefix) throws Exception;
 }

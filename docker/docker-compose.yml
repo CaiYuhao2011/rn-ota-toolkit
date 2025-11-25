@@ -11,13 +11,17 @@ services:
     environment:
       # 时区上海
       TZ: Asia/Shanghai
-      DATABASE_URL: jdbc:mysql://localhost:3306/disapp?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+      # 数据库配置
+      DATABASE_URL: jdbc:mysql://localhost:3306/sppl?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: jiafusz666
+      # MinIO 配置
       MINIO_ENDPOINT: http://localhost:9000
       MINIO_ACCESS_KEY: jiafusz
       MINIO_SECRET_KEY: jiafusz666
       MINIO_BUCKET: jiafusz
+      # Expo Updates 服务公共访问地址（客户端访问地址）
+      UPDATES_PUBLIC_BASE_URL: http://localhost:10080
     ports:
       - "10080:10080"
     privileged: true

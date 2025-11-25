@@ -2,13 +2,17 @@ package com.ota.service.impl;
 
 import com.ota.service.MinioService;
 import io.minio.*;
+import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.PostConstruct;
-import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 @Slf4j
 @Service
@@ -102,6 +106,76 @@ public class MinioServiceImpl implements MinioService {
     }
 
     @Override
+    public List<String> listDirectories(String prefix) throws Exception {
+        try {
+            Iterable<Result<Item>> results = getMinioClient().listObjects(
+                    ListObjectsArgs.builder()
+                            .bucket(bucketName)
+                            .prefix(prefix)
+                            .recursive(true)
+                            .build());
+            Set<String> directories = new TreeSet<>();
+            for (Result<Item> result : results) {
+                Item item = result.get();
+                String objectName = item.objectName();
+                if (!objectName.startsWith(prefix)) {
+                    continue;
+                }
+                String remainder = objectName.substring(prefix.length());
+                if (remainder.isEmpty()) {
+                    continue;
+                }
+                String directoryName = remainder.split("/")[0];
+                if (!directoryName.isEmpty()) {
+                    directories.add(directoryName);
+                }
+            }
+            return new ArrayList<>(directories);
+        } catch (Exception e) {
+            log.error("列出 MinIO 目录失败: {}", e.getMessage(), e);
+            throw new Exception("列出目录失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean exists(String objectName) {
+        try {
+            getMinioClient().statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .build());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
+    public void deleteDirectory(String prefix) throws Exception {
+        String normalizedPrefix = prefix.endsWith("/") ? prefix : prefix + "/";
+        try {
+            Iterable<Result<Item>> results = getMinioClient().listObjects(
+                    ListObjectsArgs.builder()
+                            .bucket(bucketName)
+                            .prefix(normalizedPrefix)
+                            .recursive(true)
+                            .build());
+            for (Result<Item> result : results) {
+                Item item = result.get();
+                getMinioClient().removeObject(
+                        RemoveObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(item.objectName())
+                                .build());
+            }
+        } catch (Exception e) {
+            log.error("删除目录 {} 失败: {}", prefix, e.getMessage(), e);
+            throw new Exception("删除目录失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public GetObjectResponse readFile(String fileName) throws Exception {
         try {
             return getMinioClient().getObject(
@@ -125,7 +199,8 @@ public class MinioServiceImpl implements MinioService {
             java.io.File predefinedTempDir = new java.io.File("/home/jiafusz/ota/temp");
             if (predefinedTempDir.exists() && predefinedTempDir.isDirectory()) {
                 // 在预定义目录下创建唯一的临时子目录
-                tempDir = java.nio.file.Paths.get(predefinedTempDir.getAbsolutePath(), "ota-extract-" + System.currentTimeMillis());
+                tempDir = java.nio.file.Paths.get(predefinedTempDir.getAbsolutePath(),
+                        "ota-extract-" + System.currentTimeMillis());
                 java.nio.file.Files.createDirectories(tempDir);
                 log.debug("使用Docker预定义临时目录: {}", tempDir);
             } else {
@@ -136,8 +211,10 @@ public class MinioServiceImpl implements MinioService {
 
             // 保存上传的压缩文件到临时目录
             String originalFilename = bundle.getOriginalFilename();
-            java.nio.file.Path zipFilePath = tempDir.resolve(originalFilename != null ? originalFilename : "bundle.zip");
-            java.nio.file.Files.copy(bundle.getInputStream(), zipFilePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            java.nio.file.Path zipFilePath = tempDir
+                    .resolve(originalFilename != null ? originalFilename : "bundle.zip");
+            java.nio.file.Files.copy(bundle.getInputStream(), zipFilePath,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
             // 解压缩文件
             try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFilePath.toFile())) {
@@ -196,16 +273,17 @@ public class MinioServiceImpl implements MinioService {
     // 注释：getZipFile 方法已整合到 uploadExtractedFiles 中
     // 不再需要单独的 getZipFile 方法
 
-
     /**
      * 递归上传目录中的所有文件
-     * @param directory 要上传的目录
-     * @param basePath MinIO中的基础路径
+     * 
+     * @param directory       要上传的目录
+     * @param basePath        MinIO中的基础路径
      * @param excludeFilename 要排除的文件名（如原始zip文件）
      */
     private void uploadDirectory(java.io.File directory, String basePath, String excludeFilename) throws Exception {
         java.io.File[] files = directory.listFiles();
-        if (files == null) return;
+        if (files == null)
+            return;
 
         for (java.io.File file : files) {
             // 跳过原始zip文件

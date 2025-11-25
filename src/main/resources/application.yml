@@ -8,7 +8,7 @@ spring:
   # 数据源配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/disapp?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai}
+    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/sppl?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai}
     username: ${DATABASE_USERNAME:root}
     password: ${DATABASE_PASSWORD:jiafusz666}
 
@@ -31,6 +31,11 @@ minio:
   access-key: ${MINIO_ACCESS_KEY:jiafusz}
   secret-key: ${MINIO_SECRET_KEY:jiafusz666}
   bucket-name: ${MINIO_BUCKET:jiafusz}
+
+updates:
+  # Expo Updates 服务公共访问地址
+  public-base-url: ${UPDATES_PUBLIC_BASE_URL:http://localhost:10080}
+  # 代码签名私钥文件位于 classpath: code-signing-keys/private-key.pem
 
 # 日志配置
 logging:

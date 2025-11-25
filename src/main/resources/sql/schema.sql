@@ -5,6 +5,7 @@ CREATE TABLE `ota_version` (
   `platform` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '平台(ios/android)',
   `version` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '版本号',
   `bundle_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Bundle文件名(MinIO对象名)',
+  `bundle_path` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Expo 资源根路径',
   `file_size` bigint NOT NULL COMMENT '文件大小(字节)',
   `update_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'incremental' COMMENT '更新类型(incremental/full)',
   `description` text COLLATE utf8mb4_unicode_ci COMMENT '版本描述',

@@ -41,26 +41,32 @@ public class OtaServiceImpl implements OtaService {
             throw new Exception("版本已存在: " + request.getVersion());
         }
 
-        // 生成文件名
-        String fileName = String.format("%s/%s/%s/%s",
-                request.getAppName(),
-                request.getPlatform(),
-                request.getVersion(),
-                request.getBundle().getOriginalFilename());
+        String fileUrl = null;
+        String versionPath = null;
 
-        // 上传文件到 MinIO
-        String fileUrl = minioService.uploadFile(request.getBundle(), fileName);
-
-        // 如果是 Expo
+        // Expo 框架：使用 runtimeVersion/platform/version 结构
         if (request.getFramework().equals(FrameworkType.EXPO.getValue())) {
+            // 路径结构: {runtimeVersion}/{platform}/{version}
+            // runtimeVersion 使用 appName
             String basePath = String.format("%s/%s/%s",
                     request.getAppName(),
                     request.getPlatform(),
                     request.getVersion());
-            // 解压缩文件，并上传按照文件夹上传每一个文件
+
+            // 解压缩文件并上传
             MultipartFile bundle = request.getBundle();
             String bundleUrl = minioService.uploadExtractedFiles(basePath, bundle);
             log.info("Expo bundle已上传至: {}", bundleUrl);
+            versionPath = basePath;
+            fileUrl = bundleUrl;
+        } else {
+            // 非 Expo 框架：保留原有结构
+            String fileName = String.format("%s/%s/%s/%s",
+                    request.getAppName(),
+                    request.getPlatform(),
+                    request.getVersion(),
+                    request.getBundle().getOriginalFilename());
+            fileUrl = minioService.uploadFile(request.getBundle(), fileName);
         }
 
         // 保存版本信息到数据库
@@ -68,7 +74,8 @@ public class OtaServiceImpl implements OtaService {
         version.setAppName(request.getAppName());
         version.setPlatform(request.getPlatform());
         version.setVersion(request.getVersion());
-        version.setBundleFilename(fileName);
+        version.setBundleFilename(versionPath != null ? versionPath : fileUrl);
+        version.setBundlePath(versionPath);
         version.setFileSize(request.getBundle().getSize());
         version.setUpdateType(request.getUpdateType());
         version.setDescription(request.getDescription());
@@ -172,6 +179,14 @@ public class OtaServiceImpl implements OtaService {
             minioService.deleteFile(versionEntity.getBundleFilename());
         } catch (Exception e) {
             log.warn("删除 MinIO 文件失败，继续删除数据库记录: {}", e.getMessage());
+        }
+
+        if (StringUtils.hasText(versionEntity.getBundlePath())) {
+            try {
+                minioService.deleteDirectory(versionEntity.getBundlePath());
+            } catch (Exception e) {
+                log.warn("删除 MinIO 目录失败: {}", e.getMessage());
+            }
         }
 
         // 删除数据库记录

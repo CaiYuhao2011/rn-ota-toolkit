@@ -5,12 +5,17 @@ import com.ota.common.Result;
 import com.ota.dto.UploadRequest;
 import com.ota.entity.AppVersion;
 import com.ota.entity.Version;
+import com.ota.service.ManifestService;
+import com.ota.service.MinioService;
 import com.ota.service.OtaService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,18 +27,52 @@ import java.util.List;
 public class OtaController {
 
     private final OtaService otaService;
+    private final ManifestService manifestService;
+    private final MinioService minioService;
 
     /**
      * Expo Manifest V1 协议实现
+     * 
      * @see [custom-expo-updates-server]{https://github.com/expo/custom-expo-updates-server}
      * @see [expo-updates]{https://docs.expo.dev/versions/latest/sdk/updates/}
      */
     @GetMapping("/manifest")
-    public Result<?> manifest(HttpServletRequest request) {
+    public void manifest(HttpServletRequest request, HttpServletResponse response) {
         try {
-
+            manifestService.endpoint(request, response);
         } catch (Exception e) {
-            //
+            log.error("Manifest 请求处理失败", e);
+            writeJsonError(response, 500, "Failed to process manifest request");
+        }
+    }
+
+    @GetMapping("/assets")
+    public void assets(
+            @RequestParam String asset,
+            @RequestParam("runtimeVersion") String runtimeVersion,
+            @RequestParam String platform,
+            HttpServletResponse response) {
+        if (!StringUtils.isNotBlank(asset)) {
+            writeJsonError(response, 400, "No asset name provided.");
+            return;
+        }
+        if (!"ios".equals(platform) && !"android".equals(platform)) {
+            writeJsonError(response, 400, "No platform provided. Expected \"ios\" or \"android\".");
+            return;
+        }
+        if (!StringUtils.isNotBlank(runtimeVersion)) {
+            writeJsonError(response, 400, "No runtimeVersion provided.");
+            return;
+        }
+
+        try (var objectStream = minioService.readFile(asset)) {
+            response.setStatus(200);
+            response.setContentType(resolveAssetContentType(asset));
+            response.setHeader("cache-control", "private, max-age=0");
+            StreamUtils.copy(objectStream, response.getOutputStream());
+        } catch (Exception e) {
+            log.error("读取资源失败: {}", asset, e);
+            writeJsonError(response, 404, "Asset \"" + asset + "\" does not exist.");
         }
     }
 
@@ -163,5 +202,40 @@ public class OtaController {
             log.error("删除版本失败", e);
             return Result.fail(e.getMessage());
         }
+    }
+
+    private void writeJsonError(HttpServletResponse response, int status, String message) {
+        if (response.isCommitted()) {
+            return;
+        }
+        try {
+            response.reset();
+            response.setStatus(status);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"error\":\"" + message.replace("\"", "\\\"") + "\"}");
+        } catch (Exception ex) {
+            log.warn("响应错误信息失败", ex);
+        }
+    }
+
+    private String resolveAssetContentType(String assetPath) {
+        if (assetPath.contains("_expo/static/js")) {
+            return "application/javascript";
+        }
+        int lastDot = assetPath.lastIndexOf('.');
+        if (lastDot == -1 || lastDot == assetPath.length() - 1) {
+            return "application/octet-stream";
+        }
+        String ext = assetPath.substring(lastDot + 1).toLowerCase();
+        return switch (ext) {
+            case "js" -> "application/javascript";
+            case "json" -> "application/json";
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            case "svg" -> "image/svg+xml";
+            case "hbc" -> "application/octet-stream";
+            default -> "application/octet-stream";
+        };
     }
 }

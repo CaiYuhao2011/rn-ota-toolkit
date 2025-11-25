@@ -26,6 +26,9 @@ public class Version {
     @TableField("bundle_filename")
     private String bundleFilename;
 
+    @TableField("bundle_path")
+    private String bundlePath;
+
     @TableField("file_size")
     private Long fileSize;
 
