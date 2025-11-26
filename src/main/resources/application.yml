@@ -33,9 +33,8 @@ minio:
   bucket-name: ${MINIO_BUCKET:jiafusz}
 
 updates:
-  # Expo Updates 服务公共访问地址
-  public-base-url: ${UPDATES_PUBLIC_BASE_URL:http://localhost:10080}
-  # 代码签名私钥文件位于 classpath: code-signing-keys/private-key.pem
+  # Expo Updates 服务公共访问地址（客户端需要能访问到这个地址）
+  public-base-url: ${UPDATES_PUBLIC_BASE_URL:http://10.1.3.126:10080}
 
 # 日志配置
 logging:

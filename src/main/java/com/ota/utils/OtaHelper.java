@@ -41,7 +41,11 @@ public final class OtaHelper {
             byte[] hashBytes = digest.digest(data);
             return switch (encoding.toLowerCase()) {
                 case "base64" -> Base64.encode(hashBytes);
-                case "base64url" -> Base64.encodeUrlSafe(hashBytes);
+                case "base64url" -> {
+                    // URL-safe base64 without padding (Expo 要求的格式)
+                    String encoded = Base64.encodeUrlSafe(hashBytes);
+                    yield encoded.replaceAll("=+$", ""); // 移除末尾的 padding
+                }
                 case "hex" -> HexUtil.encodeHexStr(hashBytes);
                 case "binary" -> new String(hashBytes, StandardCharsets.ISO_8859_1);
                 default -> throw new IllegalArgumentException("Unsupported encoding: " + encoding);
@@ -49,10 +53,6 @@ public final class OtaHelper {
         } catch (Exception e) {
             throw new RuntimeException("Error creating hash", e);
         }
-    }
-
-    private static String base64ToUrl(String base64) {
-        return base64.replace('+', '-').replace('/', '_').replaceAll("=+$", "");
     }
 
     public static String convertSHA256HashToUUID(String sha256Hash) {
@@ -132,8 +132,8 @@ public final class OtaHelper {
         String objectName = updateBundlePath + "/" + filePath;
         try {
             byte[] assetBytes = readObjectBytes(objectName);
-            String shaBase64 = createHash(assetBytes, "SHA-256", "base64");
-            String hash = base64ToUrl(shaBase64);
+            // 直接使用 base64url 编码（URL-safe，无 padding）
+            String hash = createHash(assetBytes, "SHA-256", "base64url");
             String key = createHash(assetBytes, "MD5", "hex");
             String keyExtensionSuffix = isLaunchAsset ? "bundle" : ext;
             String contentType = resolveContentType(ext, isLaunchAsset);

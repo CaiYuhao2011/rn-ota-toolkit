@@ -200,6 +200,73 @@ rn-ota delete [options]
     --server http://192.168.1.100:10080
 ```
 
+### run - 运行应用
+
+运行应用到设备或模拟器（自动更新版本号）：
+
+```bash
+rn-ota run [options]
+
+选项：
+  -p, --project <path>          项目路径（默认: 当前目录）
+  --platform <platform>         平台: android|ios（默认: android）
+  --variant <variant>           Android 构建变体: debug|release（默认: debug）
+  --configuration <config>      iOS 配置: Debug|Release
+  --device <device>             指定设备 ID 或名称
+  
+示例：
+  # 运行 Android Debug 版本
+  rn-ota run --platform android
+  
+  # 运行 Android Release 版本
+  rn-ota run --platform android --variant release
+  
+  # 运行到指定设备
+  rn-ota run --platform android --device emulator-5554
+  
+  # 运行 iOS
+  rn-ota run --platform ios
+  
+  # 运行 iOS Release 版本
+  rn-ota run --platform ios --configuration Release
+```
+
+**自动功能：**
+- ✅ 自动检测项目类型（RN / Expo）
+- ✅ 自动更新 `package.json` 版本号
+- ✅ 自动更新 Android `versionCode` 和 `versionName`
+- ✅ 自动更新 iOS `buildNumber` 和 `version`
+- ✅ Expo 项目使用 `expo run:android` 或 `expo run:ios`
+- ✅ React Native 项目使用 `react-native run-android` 或 `react-native run-ios`
+
+**输出示例：**
+
+```
+🤖 准备运行 Android 应用
+
+═══════════════════════════════════════════════════════
+项目类型: expo
+项目路径: /path/to/project
+应用名称: moldcore
+当前版本: 1.0.27 (versionCode: 10027)
+平台: Android
+构建变体: DEBUG
+
+正在更新版本号...
+✔ 版本号已更新: 1.0.27 (versionCode: 10027)
+  已更新: package.json, app.json, android/app/build.gradle
+
+═══════════════════════════════════════════════════════
+
+正在运行 Expo Android 应用...
+
+命令: npx expo run:android
+
+[Expo CLI 输出...]
+
+✔ 应用已成功启动
+```
+
 ### config - 配置管理
 
 ```bash

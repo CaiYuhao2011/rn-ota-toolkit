@@ -157,7 +157,12 @@ const ExpoAdapter: OTAAdapter = {
    */
   async preStartOtaUpdate() {
     try {
+      if (__DEV__) {
+          // DEV 绕过检查更新
+          return false;
+      }
       const update = await Updates.checkForUpdateAsync();
+      console.log('[OTA] 获取到更新信息:', update);
       return update.isAvailable;
     } catch (err) {
       console.error('[OTA] 预检查失败:', err);

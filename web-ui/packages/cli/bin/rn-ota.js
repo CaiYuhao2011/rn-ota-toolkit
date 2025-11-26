@@ -10,6 +10,7 @@ const deleteCommand = require('../commands/delete');
 const deployCommand = require('../commands/deploy');
 const buildCommand = require('../commands/build');
 const configCommand = require('../commands/config');
+const runCommand = require('../commands/run');
 const { getConfig } = require('../utils/config');
 
 const program = new Command();
@@ -83,6 +84,17 @@ program
   .option('-m, --min-app-version <version>', '最低应用版本要求', '')
   .option('--debug', 'Debug 版本（仅原生包）', false)
   .action(deployCommand);
+
+// 运行命令（运行应用到设备/模拟器）
+program
+  .command('run')
+  .description('运行应用到设备或模拟器（自动更新版本号）')
+  .option('-p, --project <path>', 'React Native/Expo 项目路径', '.')
+  .option('--platform <platform>', '平台：android 或 ios', 'android')
+  .option('--variant <variant>', 'Android 构建变体：debug 或 release', 'debug')
+  .option('--configuration <config>', 'iOS 配置：Debug 或 Release')
+  .option('--device <device>', '指定设备 ID 或名称')
+  .action(runCommand);
 
 // 错误处理
 program.on('command:*', function () {

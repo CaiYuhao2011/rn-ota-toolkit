@@ -1,6 +1,6 @@
 {
   "name": "rn-ota-cli",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "React Native OTA 命令行工具",
   "main": "index.js",
   "bin": {

@@ -17,12 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,8 +38,6 @@ public class ManifestServiceImpl implements ManifestService {
 
     @Value("${updates.public-base-url:http://localhost:10080}")
     private String publicBaseUrl;
-
-    private volatile PrivateKey cachedPrivateKey;
 
     @Override
     public void endpoint(HttpServletRequest request, HttpServletResponse response) {
@@ -144,7 +137,6 @@ public class ManifestServiceImpl implements ManifestService {
         manifest.put("extra", Map.of("expoClient", expoConfig));
 
         String manifestPayload = objectMapper.writeValueAsString(manifest);
-        String signature = maybeSignPayload(manifestPayload, request);
 
         Map<String, Object> assetRequestHeaders = new LinkedHashMap<>();
         assets.forEach(asset -> assetRequestHeaders.put(asset.getKey(), defaultAssetHeader()));
@@ -154,8 +146,8 @@ public class ManifestServiceImpl implements ManifestService {
         String extensionsPayload = objectMapper.writeValueAsString(extensions);
 
         List<MultipartSection> sections = new ArrayList<>();
-        sections.add(new MultipartSection("manifest", manifestPayload, signature));
-        sections.add(new MultipartSection("extensions", extensionsPayload, null));
+        sections.add(new MultipartSection("manifest", manifestPayload));
+        sections.add(new MultipartSection("extensions", extensionsPayload));
 
         writeMultipartResponse(response, protocolVersion, sections);
     }
@@ -182,12 +174,11 @@ public class ManifestServiceImpl implements ManifestService {
 
         var directiveJson = OtaHelper.createRollBackDirective(updateBundlePath);
         String directivePayload = directiveJson.toString();
-        String signature = maybeSignPayload(directivePayload, request);
 
         writeMultipartResponse(
                 response,
                 protocolVersion == 0 ? 1 : protocolVersion,
-                List.of(new MultipartSection("directive", directivePayload, signature)));
+                List.of(new MultipartSection("directive", directivePayload)));
     }
 
     private void putNoUpdateAvailableInResponse(
@@ -201,11 +192,10 @@ public class ManifestServiceImpl implements ManifestService {
 
         var directiveJson = OtaHelper.createNoUpdateAvailableDirective();
         String directivePayload = directiveJson.toString();
-        String signature = maybeSignPayload(directivePayload, request);
         writeMultipartResponse(
                 response,
                 1,
-                List.of(new MultipartSection("directive", directivePayload, signature)));
+                List.of(new MultipartSection("directive", directivePayload)));
     }
 
     private String resolvePlatform(HttpServletRequest request) {
@@ -262,64 +252,6 @@ public class ManifestServiceImpl implements ManifestService {
         return Map.of("test-header", "test-header-value");
     }
 
-    private String maybeSignPayload(String payload, HttpServletRequest request) throws Exception {
-        String expectSignature = request.getHeader("expo-expect-signature");
-        if (StringUtils.isBlank(expectSignature)) {
-            return null;
-        }
-        PrivateKey privateKey = loadPrivateKey();
-        if (privateKey == null) {
-            throw new IllegalArgumentException("Code signing requested but no key supplied when starting server.");
-        }
-        Signature signature = Signature.getInstance("SHA256withRSA");
-        signature.initSign(privateKey);
-        signature.update(payload.getBytes(StandardCharsets.UTF_8));
-        String signed = Base64.getEncoder().encodeToString(signature.sign());
-        return "sig=:" + signed + ":,keyid=\"main\"";
-    }
-
-    /**
-     * 从 classpath 加载私钥
-     * 私钥文件位于: src/main/resources/code-signing-keys/private-key.pem
-     */
-    private PrivateKey loadPrivateKey() throws Exception {
-        if (cachedPrivateKey != null) {
-            return cachedPrivateKey;
-        }
-        synchronized (this) {
-            if (cachedPrivateKey != null) {
-                return cachedPrivateKey;
-            }
-
-            // 从 classpath 读取私钥文件
-            try (var inputStream = getClass().getClassLoader()
-                    .getResourceAsStream("code-signing-keys/private-key.pem")) {
-
-                if (inputStream == null) {
-                    log.warn("私钥文件不存在: code-signing-keys/private-key.pem，代码签名将被禁用");
-                    return null;
-                }
-
-                String keyPem = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)
-                        .replace("-----BEGIN PRIVATE KEY-----", "")
-                        .replace("-----END PRIVATE KEY-----", "")
-                        .replaceAll("\\s", "");
-
-                byte[] keyBytes = Base64.getDecoder().decode(keyPem);
-                PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
-
-                try {
-                    cachedPrivateKey = KeyFactory.getInstance("RSA").generatePrivate(keySpec);
-                    log.info("成功加载代码签名私钥");
-                } catch (Exception e) {
-                    throw new IllegalArgumentException("Invalid private key file format.", e);
-                }
-
-                return cachedPrivateKey;
-            }
-        }
-    }
-
     private void writeMultipartResponse(HttpServletResponse response, int protocolVersion,
             List<MultipartSection> sections) throws Exception {
         String boundary = "expo-manifest-boundary-" + UUID.randomUUID();
@@ -333,9 +265,6 @@ public class ManifestServiceImpl implements ManifestService {
         for (MultipartSection section : sections) {
             outputStream.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
             outputStream.write("content-type: application/json; charset=utf-8\r\n".getBytes(StandardCharsets.UTF_8));
-            if (StringUtils.isNotBlank(section.signature)) {
-                outputStream.write(("expo-signature: " + section.signature + "\r\n").getBytes(StandardCharsets.UTF_8));
-            }
             outputStream.write(("content-disposition: inline; name=\"" + section.name + "\"\r\n\r\n")
                     .getBytes(StandardCharsets.UTF_8));
             outputStream.write(section.payload.getBytes(StandardCharsets.UTF_8));
@@ -364,6 +293,6 @@ public class ManifestServiceImpl implements ManifestService {
         ROLLBACK
     }
 
-    private record MultipartSection(String name, String payload, String signature) {
+    private record MultipartSection(String name, String payload) {
     }
 }
