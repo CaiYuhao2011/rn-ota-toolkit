@@ -216,6 +216,19 @@ public class MinioServiceImpl implements MinioService {
             java.nio.file.Files.copy(bundle.getInputStream(), zipFilePath,
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
+            // 先上传 zip 文件本身到 MinIO
+            String zipObjectName = basePath + "/" + (originalFilename != null ? originalFilename : "bundle.zip");
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(zipFilePath.toFile())) {
+                getMinioClient().putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(zipObjectName)
+                                .stream(fis, zipFilePath.toFile().length(), -1)
+                                .contentType("application/zip")
+                                .build());
+                log.info("已上传 zip 文件: {}", zipObjectName);
+            }
+
             // 解压缩文件
             try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFilePath.toFile())) {
                 java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
@@ -249,11 +262,11 @@ public class MinioServiceImpl implements MinioService {
                 }
             }
 
-            // 递归上传所有文件（排除原始zip文件）
+            // 递归上传所有解压后的文件（排除原始zip文件）
             uploadDirectory(tempDir.toFile(), basePath, originalFilename);
 
-            // 返回文件夹URL
-            return getFileUrl(basePath);
+            // 返回 zip 文件的 URL
+            return getFileUrl(zipObjectName);
         } catch (Exception e) {
             log.error("解压并上传文件失败: {}", e.getMessage(), e);
             throw new Exception("解压并上传文件失败: " + e.getMessage());

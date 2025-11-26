@@ -11,6 +11,7 @@ const deployCommand = require('../commands/deploy');
 const buildCommand = require('../commands/build');
 const configCommand = require('../commands/config');
 const runCommand = require('../commands/run');
+const initCommand = require('../commands/init');
 const { getConfig } = require('../utils/config');
 
 const program = new Command();
@@ -19,6 +20,12 @@ program
   .name('rn-ota')
   .description('React Native OTA 命令行工具')
   .version(packageJson.version);
+
+// 初始化项目命令
+program
+  .command('init [project-name]')
+  .description('创建新的 React Native OTA 项目')
+  .action(initCommand);
 
 // 配置命令
 program

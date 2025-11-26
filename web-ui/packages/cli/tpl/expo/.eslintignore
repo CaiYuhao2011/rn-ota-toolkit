@@ -1,0 +1,10 @@
+node_modules/
+.expo/
+.expo-shared/
+dist/
+build/
+android/
+ios/
+plugins/
+*.config.js
+*.config.ts

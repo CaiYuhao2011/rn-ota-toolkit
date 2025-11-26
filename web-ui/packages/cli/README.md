@@ -19,7 +19,31 @@ npm install -g rn-ota-cli
 
 ## 快速开始
 
-### 1. 配置文件（可选）
+### 1. 创建新项目
+
+使用 `init` 命令快速创建一个基于 Expo 模板的新项目：
+
+```bash
+# 创建新项目
+rn-ota init my-app
+
+# 或者交互式创建
+rn-ota init
+```
+
+创建过程中会提示输入：
+- **应用名称（英文）**：全小写字母，用于 package.json 和 app.json 的 slug
+- **应用显示名称（中文）**：用于 app.json 的 name 字段
+
+创建完成后：
+
+```bash
+cd my-app
+npm install
+npm start
+```
+
+### 2. 配置文件（可选）
 
 在项目根目录创建 `.ota.config.json`：
 
@@ -30,7 +54,7 @@ npm install -g rn-ota-cli
 }
 ```
 
-### 2. 构建
+### 3. 构建
 
 ```bash
 # 构建 OTA Bundle
@@ -43,7 +67,7 @@ rn-ota build --platform android -t apk
 rn-ota build --platform ios -t ipa
 ```
 
-### 3. 上传
+### 4. 上传
 
 ```bash
 rn-ota upload \
@@ -54,6 +78,54 @@ rn-ota upload \
 ```
 
 ## 命令详解
+
+### init - 初始化项目
+
+创建一个新的 React Native OTA 项目（基于 Expo 模板）：
+
+```bash
+rn-ota init [project-name]
+
+参数：
+  project-name              项目文件夹名称（可选，不提供则交互式输入）
+  
+示例：
+  # 直接创建
+  rn-ota init my-app
+  
+  # 交互式创建
+  rn-ota init
+```
+
+**创建流程：**
+1. 输入项目文件夹名称
+2. 输入应用名称（英文，全小写字母）- 用于 package.json 和 app.json 的 slug
+3. 输入应用显示名称（中文）- 用于 app.json 的 name
+4. 自动创建项目目录
+5. 复制 Expo 模板文件
+6. 替换模板中的 `{name}` 和 `{slug}` 占位符
+
+**生成的项目结构：**
+```
+my-app/
+├── app/                    # Expo Router 页面
+├── assets/                 # 静态资源
+├── components/             # 组件
+├── utils/                  # 工具函数
+├── app.json                # Expo 配置（已替换 name 和 slug）
+├── package.json            # 项目配置（已替换 name）
+├── tsconfig.json           # TypeScript 配置
+└── ...
+```
+
+**占位符替换：**
+- `{name}` → 应用显示名称（中文）
+- `{slug}` → 应用名称（英文）
+
+替换的文件包括：
+- `app.json`: name, slug, scheme, runtimeVersion, bundleIdentifier, package
+- `package.json`: name
+- `package-lock.json`: name
 
 ### build - 构建
 

@@ -44,8 +44,9 @@ public class OtaServiceImpl implements OtaService {
         String fileUrl = null;
         String versionPath = null;
 
-        // Expo 框架：使用 runtimeVersion/platform/version 结构
-        if (request.getFramework().equals(FrameworkType.EXPO.getValue())) {
+        // Expo 框架 + bundle 类型：使用 runtimeVersion/platform/version 结构并解压
+        if (request.getFramework().equals(FrameworkType.EXPO.getValue()) 
+                && "bundle".equalsIgnoreCase(request.getUpdateType())) {
             // 路径结构: {runtimeVersion}/{platform}/{version}
             // runtimeVersion 使用 appName
             String basePath = String.format("%s/%s/%s",
@@ -60,7 +61,7 @@ public class OtaServiceImpl implements OtaService {
             versionPath = basePath;
             fileUrl = bundleUrl;
         } else {
-            // 非 Expo 框架：保留原有结构
+            // 其他情况（非 Expo 或 Expo 全量更新）：保留原有结构
             String fileName = String.format("%s/%s/%s/%s",
                     request.getAppName(),
                     request.getPlatform(),
