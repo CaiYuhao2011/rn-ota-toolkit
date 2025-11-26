@@ -73,5 +73,6 @@ logs/
 .DS_Store
 
 server.yml
+docker-compose-*.yml
 
 *.jar
