@@ -55,8 +55,8 @@ function validateAppName(name) {
 /**
  * Init 命令主函数
  */
-async function initCommand(projectName, options) {
-  console.log(chalk.cyan('\n🚀 创建新的 React Native OTA 项目\n'));
+async function initCommand(projectName, options = {}) {
+  console.log(chalk.cyan('\n🚀 创建新的 React Native Expo 项目\n'));
   console.log(chalk.gray('═══════════════════════════════════════════════════════\n'));
 
   try {
@@ -86,32 +86,57 @@ async function initCommand(projectName, options) {
       process.exit(1);
     }
 
-    // 获取应用配置
-    const config = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'appName',
-        message: '请输入应用名称（英文，全小写字母）:',
-        default: projectName,
-        validate: validateAppName
-      },
-      {
-        type: 'input',
-        name: 'slug',
-        message: '请输入应用显示名称（中文）:',
-        validate: (input) => {
-          if (!input) return '应用显示名称不能为空';
-          return true;
-        }
-      }
-    ]);
+    // 从命令行参数或交互式输入获取应用配置
+    let slug = options.slug;
+    let appName = options.name;
 
-    const { appName, slug } = config;
+    // 如果命令行参数中没有提供 slug，则交互式输入
+    if (!slug) {
+      const slugAnswer = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'slug',
+          message: '请输入应用名称（英文，全小写字母）:',
+          default: projectName,
+          validate: validateAppName
+        }
+      ]);
+      slug = slugAnswer.slug;
+    } else {
+      // 验证命令行参数中的 slug
+      const validation = validateAppName(slug);
+      if (validation !== true) {
+        console.error(chalk.red(`\n❌ ${validation}\n`));
+        process.exit(1);
+      }
+    }
+
+    // 如果命令行参数中没有提供 name，则交互式输入
+    if (!appName) {
+      const nameAnswer = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'appName',
+          message: '请输入应用显示名称（中文）:',
+          validate: (input) => {
+            if (!input) return '应用显示名称不能为空';
+            return true;
+          }
+        }
+      ]);
+      appName = nameAnswer.appName;
+    } else {
+      // 验证命令行参数中的 name
+      if (!appName.trim()) {
+        console.error(chalk.red('\n❌ 应用显示名称不能为空\n'));
+        process.exit(1);
+      }
+    }
 
     console.log(chalk.gray('\n═══════════════════════════════════════════════════════\n'));
     console.log(`项目名称: ${chalk.green(projectName)}`);
-    console.log(`应用名称: ${chalk.green(appName)}`);
-    console.log(`显示名称: ${chalk.green(slug)}`);
+    console.log(`应用名称: ${chalk.green(slug)}`);
+    console.log(`显示名称: ${chalk.green(appName)}`);
     console.log(chalk.gray('\n═══════════════════════════════════════════════════════\n'));
 
     // 创建项目目录
@@ -131,8 +156,8 @@ async function initCommand(projectName, options) {
 
     // 准备替换的占位符
     const replacements = {
-      name: slug,      // app.json 中的 name 使用中文显示名称
-      slug: appName    // app.json 和 package.json 中的 slug/name 使用英文名称
+      name: appName,   // app.json 中的 name 使用中文显示名称
+      slug: slug       // app.json 和 package.json 中的 slug/name 使用英文名称
     };
 
     copyDirectory(templatePath, projectPath, replacements);

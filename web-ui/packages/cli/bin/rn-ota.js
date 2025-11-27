@@ -25,6 +25,8 @@ program
 program
   .command('init [project-name]')
   .description('创建新的 React Native OTA 项目')
+  .option('--slug <slug>', '应用名称（英文，全小写字母）')
+  .option('--name <name>', '应用显示名称（中文）')
   .action(initCommand);
 
 // 配置命令

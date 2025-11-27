@@ -84,26 +84,51 @@ rn-ota upload \
 创建一个新的 React Native OTA 项目（基于 Expo 模板）：
 
 ```bash
-rn-ota init [project-name]
+rn-ota init [project-name] [options]
 
 参数：
   project-name              项目文件夹名称（可选，不提供则交互式输入）
+
+选项：
+  --slug <slug>             应用名称（英文，全小写字母）- 用于 app.json 的 slug
+  --name <name>             应用显示名称（中文）- 用于 app.json 的 name
   
 示例：
-  # 直接创建
+  # 交互式创建（推荐）
+  rn-ota init
+  
+  # 指定项目名称，交互式输入 slug 和 name
   rn-ota init my-app
   
-  # 交互式创建
-  rn-ota init
+  # 完全非交互式创建（适合脚本）
+  rn-ota init my-app --slug my-app --name "我的应用"
+  
+  # 只指定 slug，交互式输入 name
+  rn-ota init my-app --slug my-app
 ```
 
 **创建流程：**
-1. 输入项目文件夹名称
-2. 输入应用名称（英文，全小写字母）- 用于 package.json 和 app.json 的 slug
-3. 输入应用显示名称（中文）- 用于 app.json 的 name
+1. 输入项目文件夹名称（如果未提供）
+2. 输入应用名称/slug（英文，全小写字母）- 用于 app.json 的 slug、scheme、bundleIdentifier 等
+3. 输入应用显示名称/name（中文）- 用于 app.json 的 name 字段
 4. 自动创建项目目录
 5. 复制 Expo 模板文件
 6. 替换模板中的 `{name}` 和 `{slug}` 占位符
+
+**参数说明：**
+
+| 参数 | 说明 | 示例 | 用途 |
+|------|------|------|------|
+| `project-name` | 项目文件夹名称 | `my-app` | 创建的目录名 |
+| `--slug` | 应用英文标识符 | `my-app` | app.json 的 slug、scheme、bundleIdentifier、package |
+| `--name` | 应用显示名称 | `我的应用` | app.json 的 name（用户看到的名称）|
+
+**slug 命名规则：**
+- 只能包含小写字母（a-z）
+- 可以包含数字（0-9）
+- 可以包含连字符（-）
+- 不能包含空格、大写字母、下划线或其他特殊字符
+- 示例：`my-app`、`demo-2024`、`test-app-v2`
 
 **生成的项目结构：**
 ```
@@ -119,13 +144,61 @@ my-app/
 ```
 
 **占位符替换：**
-- `{name}` → 应用显示名称（中文）
-- `{slug}` → 应用名称（英文）
+- `{name}` → 应用显示名称（中文），如 "我的应用"
+- `{slug}` → 应用英文标识符，如 "my-app"
 
-替换的文件包括：
-- `app.json`: name, slug, scheme, runtimeVersion, bundleIdentifier, package
-- `package.json`: name
-- `package-lock.json`: name
+**替换的文件和字段：**
+
+`app.json`:
+```json
+{
+  "expo": {
+    "name": "{name}",                          // → "我的应用"
+    "slug": "{slug}",                          // → "my-app"
+    "scheme": "{slug}",                        // → "my-app"
+    "runtimeVersion": "{slug}",                // → "my-app"
+    "ios": {
+      "bundleIdentifier": "com.jiafusz.{slug}" // → "com.jiafusz.my-app"
+    },
+    "android": {
+      "package": "com.jiafusz.{slug}"          // → "com.jiafusz.my-app"
+    }
+  }
+}
+```
+
+`package.json`:
+```json
+{
+  "name": "{slug}",  // → "my-app"
+  "version": "1.0.0"
+}
+```
+
+**完整示例：**
+
+```bash
+# 1. 交互式创建（最灵活）
+$ rn-ota init
+? 请输入项目文件夹名称: my-app
+? 请输入应用名称（英文，全小写字母）: my-app
+? 请输入应用显示名称（中文）: 我的应用
+
+# 2. 指定项目名，交互式输入其他信息
+$ rn-ota init my-app
+? 请输入应用名称（英文，全小写字母）: (my-app) 
+? 请输入应用显示名称（中文）: 我的应用
+
+# 3. 完全非交互式（适合 CI/CD）
+$ rn-ota init my-app --slug my-app --name "我的应用"
+
+✅ 项目创建完成！
+
+下一步操作：
+  cd my-app
+  npm install
+  npm start
+```
 
 ### build - 构建
 
